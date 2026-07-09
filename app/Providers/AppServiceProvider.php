@@ -115,11 +115,15 @@ class AppServiceProvider extends ServiceProvider
                 $queryCount = count($queries);
                 $dbConnection = config('database.default');
                 $dbDriver = config("database.connections.{$dbConnection}.driver");
+                $dbName = config("database.connections.{$dbConnection}.database");
+                $dbUsername = config("database.connections.{$dbConnection}.username");
                 
                 $view->with('queryCount', $queryCount);
                 $view->with('queries', $queries);
                 $view->with('dbConnection', $dbConnection);
                 $view->with('dbDriver', $dbDriver);
+                $view->with('dbName', $dbName);
+                $view->with('dbUsername', $dbUsername);
                 $view->with('showDebugInfo', true);
                 
                 // Pass captured logs to view

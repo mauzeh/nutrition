@@ -97,7 +97,7 @@
         <footer>
             <div class="container">
                 @if(isset($queryCount))
-                    <pre class="git-log">Queries: {{ $queryCount }} | Database: {{ $dbConnection ?? 'unknown' }} ({{ $dbDriver ?? 'unknown' }})</pre><br>
+                    <pre class="git-log">Queries: {{ $queryCount }} | Database: {{ $dbConnection ?? 'unknown' }} ({{ $dbDriver ?? 'unknown' }}) | Name: {{ $dbName ?? 'unknown' }} | User: {{ $dbUsername ?? 'unknown' }}</pre><br>
                 @endif
                 @if(isset($gitBranch))
                     <pre class="git-log">Branch: {{ $gitBranch }}</pre>
