@@ -267,17 +267,15 @@ class RegularExerciseType extends BaseExerciseType
         foreach ($currentMetrics['rep_weights'] as $reps => $weight) {
             $previousBestResult = $this->getBestWeightForReps($previousLogs, $reps, $targetUnit);
             
-            // No previous best at this rep count — check if dominated by higher rep count
+            // No previous best at this rep count — first time is always a PR
             if ($previousBestResult['weight'] == 0) {
-                if (!$this->isDominatedByHigherReps($previousLogs, $reps, $weight, $targetUnit, $tolerance)) {
-                    $prs[] = [
-                        'type' => 'rep_specific',
-                        'rep_count' => $reps,
-                        'value' => $weight,
-                        'previous_value' => null,
-                        'previous_lift_log_id' => null,
-                    ];
-                }
+                $prs[] = [
+                    'type' => 'rep_specific',
+                    'rep_count' => $reps,
+                    'value' => $weight,
+                    'previous_value' => null,
+                    'previous_lift_log_id' => null,
+                ];
                 continue;
             }
             
@@ -511,22 +509,6 @@ class RegularExerciseType extends BaseExerciseType
         return ['weight' => $maxWeight, 'lift_log_id' => $liftLogId];
     }
     
-    /**
-     * Check if a weight at a given rep count is dominated by a higher rep count.
-     * If the athlete has done the same (or more) weight at more reps, then doing
-     * fewer reps at that weight is not a rep-specific PR (more reps = harder).
-     */
-    private function isDominatedByHigherReps(\Illuminate\Database\Eloquent\Collection $logs, int $reps, float $weight, string $targetUnit, float $tolerance): bool
-    {
-        for ($r = $reps + 1; $r <= 10; $r++) {
-            $bestAtR = $this->getBestWeightForReps($logs, $r, $targetUnit);
-            if ($bestAtR['weight'] >= $weight - $tolerance) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /**
      * Get best reps at specific weight from previous logs, normalized to target unit
      */
