@@ -20,6 +20,7 @@ class SetFieldMapper
             case 'barbell':
             case 'single-dumbbell':
             case 'dual-dumbbell':
+            case 'machine':
                 $columns['weight'] = $setData['weight'] ?? null;
                 $columns['reps'] = $setData['reps'] ?? null;
                 break;
@@ -95,6 +96,7 @@ class SetFieldMapper
             case 'barbell':
             case 'single-dumbbell':
             case 'dual-dumbbell':
+            case 'machine':
                 $data['weight'] = $set->weight;
                 $data['reps'] = $set->reps;
                 break;
