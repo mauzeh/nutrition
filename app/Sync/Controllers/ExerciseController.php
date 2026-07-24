@@ -29,7 +29,8 @@ class ExerciseController
         $canonicalName = $request->input('canonical_name') ?: Str::snake(Str::lower($title));
 
         // Check if user already has an exercise with this canonical name
-        $existing = Exercise::where('user_id', $user->id)
+        $existing = Exercise::withTrashed()
+            ->where('user_id', $user->id)
             ->where('canonical_name', $canonicalName)
             ->first();
 
