@@ -208,9 +208,10 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 ### Running Tests
 - Run the minimal number of tests, using an appropriate filter, before finalizing.
-- To run all tests: `php artisan test`.
+- To run all tests in parallel: `php artisan test --parallel`.
 - To run all tests in a file: `php artisan test tests/Feature/ExampleTest.php`.
 - To filter on a particular test name: `php artisan test --filter=testName` (recommended after making a change to a related file).
+- When running the full suite, always use `--parallel` to leverage ParaTest for speed.
 
 
 === tailwindcss/core rules ===
