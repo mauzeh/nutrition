@@ -80,6 +80,12 @@ class SetFieldMapper
                 $columns['band_color'] = $setData['bandColor'] ?? $setData['band_color'] ?? null;
                 $columns['reps'] = $setData['reps'] ?? null;
                 break;
+
+            case 'sled':
+                $columns['weight'] = $setData['weight'] ?? null;
+                $columns['distance'] = $setData['distance'] ?? null;
+                $columns['distance_unit'] = $setData['distanceUnit'] ?? $setData['distance_unit'] ?? null;
+                break;
         }
 
         return $columns;
@@ -155,6 +161,12 @@ class SetFieldMapper
             case 'banded':
                 $data['bandColor'] = $set->band_color;
                 $data['reps'] = $set->reps;
+                break;
+
+            case 'sled':
+                $data['weight'] = $set->weight;
+                $data['distance'] = $set->distance;
+                $data['distanceUnit'] = $set->distance_unit;
                 break;
         }
 

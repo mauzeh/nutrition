@@ -129,6 +129,7 @@ class ExerciseResolverService
             'bodyweight', 'bodyweight-reps', 'added-weight' => 'bodyweight',
             'banded' => 'banded_resistance',
             'cardio', 'cardio-calories', 'cardio-distance' => 'cardio',
+            'sled' => 'sled',
             default => 'regular',
         };
     }

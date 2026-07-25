@@ -223,6 +223,49 @@ return [
         ],
 
         /**
+         * Sled Exercise Type
+         * 
+         * Sled-based exercises (Sled Push, Sled Pull) that combine plate weight
+         * with distance. Weight represents plates loaded on the sled, distance
+         * represents how far it was pushed/pulled.
+         */
+        'sled' => [
+            'class' => \App\Services\ExerciseTypes\SledExerciseType::class,
+            'validation' => [
+                'weight' => 'required|numeric|min:0|max:2000',
+                'distance' => 'required|numeric|min:0|max:999',
+                'distance_unit' => 'required|string|in:m,ft',
+            ],
+            'chart_type' => 'sled_progression',
+            'supports_1rm' => false,
+            'form_fields' => ['weight', 'distance', 'distance_unit'],
+            'progression_types' => ['weight_progression', 'distance_progression'],
+            'display_format' => 'weight_distance',
+            'field_labels' => [
+                'weight' => 'Weight (lbs):',
+                'distance' => 'Distance:',
+                'distance_unit' => 'Unit:',
+            ],
+            'field_increments' => [
+                'weight' => 45,
+                'distance' => 5,
+            ],
+            'field_defaults' => [
+                'weight' => 90,
+                'distance' => 50,
+                'distance_unit' => 'm',
+            ],
+            'field_mins' => [
+                'weight' => 0,
+                'distance' => 0,
+            ],
+            'field_maxes' => [
+                'weight' => 2000,
+                'distance' => 999,
+            ],
+        ],
+
+        /**
          * Static Hold Exercise Type
          * 
          * Isometric hold exercises commonly used in gymnastics and calisthenics.
