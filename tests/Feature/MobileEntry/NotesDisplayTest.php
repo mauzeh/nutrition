@@ -147,18 +147,20 @@ class NotesDisplayTest extends TestCase
     public function it_displays_multiple_lift_logs_with_mixed_notes()
     {
         // Arrange: Create multiple lift logs with different note scenarios
+        // Use today() + hours to guarantee both logs land on the same calendar date
+        // regardless of what time of day the test runs (avoids midnight boundary issues)
         $liftLog1 = LiftLog::factory()->create([
             'user_id' => $this->user->id,
             'exercise_id' => $this->exercise->id,
             'comments' => 'Great workout!',
-            'logged_at' => now()->subHours(2)
+            'logged_at' => today()->addHours(10)
         ]);
         
         $liftLog2 = LiftLog::factory()->create([
             'user_id' => $this->user->id,
             'exercise_id' => $this->exercise->id,
             'comments' => null,
-            'logged_at' => now()->subHours(1)
+            'logged_at' => today()->addHours(11)
         ]);
         
         LiftSet::factory()->create(['lift_log_id' => $liftLog1->id, 'weight' => 185, 'reps' => 5]);
