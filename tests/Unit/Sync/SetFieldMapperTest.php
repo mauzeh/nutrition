@@ -144,22 +144,22 @@ class SetFieldMapperTest extends TestCase
         $this->assertEquals(100, $mapped['weight']);
         $this->assertEquals(5, $mapped['reps']);
 
-        // 2. bodyweight
+        // 2. bodyweight — returns 'weight' (Athlete handles rename to addedWeight)
         $set = new LiftSet(['weight' => 20, 'reps' => 8]);
         $mapped = $this->mapper->mapFromColumns('bodyweight', $set);
-        $this->assertEquals(20, $mapped['addedWeight']);
+        $this->assertEquals(20, $mapped['weight']);
         $this->assertEquals(8, $mapped['reps']);
 
-        // 3. kettlebell
+        // 3. kettlebell — returns 'weight' (Athlete handles rename to kbWeight + unit conversion)
         $set = new LiftSet(['weight' => 16, 'reps' => 12]);
         $mapped = $this->mapper->mapFromColumns('kettlebell', $set);
-        $this->assertEquals(16, $mapped['kbWeight']);
+        $this->assertEquals(16, $mapped['weight']);
         $this->assertEquals(12, $mapped['reps']);
 
-        // 4. ball
+        // 4. ball — returns 'weight' (Athlete handles rename to ballWeight)
         $set = new LiftSet(['weight' => 15, 'reps' => 20]);
         $mapped = $this->mapper->mapFromColumns('ball', $set);
-        $this->assertEquals(15, $mapped['ballWeight']);
+        $this->assertEquals(15, $mapped['weight']);
         $this->assertEquals(20, $mapped['reps']);
 
         // 5. bodyweight-reps
@@ -178,17 +178,17 @@ class SetFieldMapperTest extends TestCase
         $this->assertEquals(60, $mapped['weight']);
         $this->assertEquals(30, $mapped['duration']);
 
-        // 8. dual-kettlebell
+        // 8. dual-kettlebell — returns 'weight' (Athlete handles rename to kbWeight + unit conversion)
         $set = new LiftSet(['weight' => 24, 'time' => 45]);
         $mapped = $this->mapper->mapFromColumns('dual-kettlebell', $set);
-        $this->assertEquals(24, $mapped['kbWeight']);
+        $this->assertEquals(24, $mapped['weight']);
         $this->assertEquals(45, $mapped['duration']);
 
-        // 9. cardio
+        // 9. cardio — returns snake_case (Athlete handles rename)
         $set = new LiftSet(['distance' => 1609.34, 'distance_unit' => 'm', 'time' => 480, 'calories' => 150]);
         $mapped = $this->mapper->mapFromColumns('cardio', $set);
         $this->assertEquals(1609.34, $mapped['distance']);
-        $this->assertEquals('m', $mapped['distanceUnit']);
+        $this->assertEquals('m', $mapped['distance_unit']);
         $this->assertEquals(480, $mapped['time']);
         $this->assertEquals(150, $mapped['calories']);
 
@@ -197,17 +197,17 @@ class SetFieldMapperTest extends TestCase
         $mapped = $this->mapper->mapFromColumns('cardio-calories', $set);
         $this->assertEquals(300, $mapped['calories']);
 
-        // 11. cardio-distance
+        // 11. cardio-distance — returns snake_case
         $set = new LiftSet(['distance' => 5, 'distance_unit' => 'km', 'time' => 1500]);
         $mapped = $this->mapper->mapFromColumns('cardio-distance', $set);
         $this->assertEquals(5, $mapped['distance']);
-        $this->assertEquals('km', $mapped['distanceUnit']);
+        $this->assertEquals('km', $mapped['distance_unit']);
         $this->assertEquals(1500, $mapped['time']);
 
-        // 12. banded
+        // 12. banded — returns snake_case
         $set = new LiftSet(['band_color' => 'Blue', 'reps' => 10]);
         $mapped = $this->mapper->mapFromColumns('banded', $set);
-        $this->assertEquals('Blue', $mapped['bandColor']);
+        $this->assertEquals('Blue', $mapped['band_color']);
         $this->assertEquals(10, $mapped['reps']);
     }
 }

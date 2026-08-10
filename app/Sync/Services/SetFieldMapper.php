@@ -92,7 +92,11 @@ class SetFieldMapper
     }
 
     /**
-     * Map database columns to front-end set data.
+     * Map database columns to wire format for the Athlete sync API.
+     *
+     * Always returns 'weight' — never typed aliases (kbWeight, addedWeight,
+     * ballWeight). The Athlete side owns field renaming and unit conversion
+     * based on the logType included in the response.
      */
     public function mapFromColumns(string $logType, LiftSet $set): array
     {
@@ -103,23 +107,11 @@ class SetFieldMapper
             case 'single-dumbbell':
             case 'dual-dumbbell':
             case 'machine':
-                $data['weight'] = $set->weight;
-                $data['reps'] = $set->reps;
-                break;
-
             case 'bodyweight':
             case 'added-weight':
-                $data['addedWeight'] = $set->weight;
-                $data['reps'] = $set->reps;
-                break;
-
             case 'kettlebell':
-                $data['kbWeight'] = $set->weight;
-                $data['reps'] = $set->reps;
-                break;
-
             case 'ball':
-                $data['ballWeight'] = $set->weight;
+                $data['weight'] = $set->weight;
                 $data['reps'] = $set->reps;
                 break;
 
@@ -132,18 +124,14 @@ class SetFieldMapper
                 break;
 
             case 'weighted-carry':
-                $data['weight'] = $set->weight;
-                $data['duration'] = $set->time;
-                break;
-
             case 'dual-kettlebell':
-                $data['kbWeight'] = $set->weight;
+                $data['weight'] = $set->weight;
                 $data['duration'] = $set->time;
                 break;
 
             case 'cardio':
                 $data['distance'] = $set->distance;
-                $data['distanceUnit'] = $set->distance_unit;
+                $data['distance_unit'] = $set->distance_unit;
                 $data['time'] = $set->time;
                 $data['calories'] = $set->calories;
                 break;
@@ -154,19 +142,19 @@ class SetFieldMapper
 
             case 'cardio-distance':
                 $data['distance'] = $set->distance;
-                $data['distanceUnit'] = $set->distance_unit;
+                $data['distance_unit'] = $set->distance_unit;
                 $data['time'] = $set->time;
                 break;
 
             case 'banded':
-                $data['bandColor'] = $set->band_color;
+                $data['band_color'] = $set->band_color;
                 $data['reps'] = $set->reps;
                 break;
 
             case 'sled':
                 $data['weight'] = $set->weight;
                 $data['distance'] = $set->distance;
-                $data['distanceUnit'] = $set->distance_unit;
+                $data['distance_unit'] = $set->distance_unit;
                 break;
         }
 
