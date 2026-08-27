@@ -60,17 +60,15 @@ boolean oracle, and the route is rate limited (see below).
 
 ### Rate limiting
 
-The `email-check` limiter is defined in
-`app/Providers/AppServiceProvider.php` (in `boot()`, alongside the sync limiters):
-
-```php
-RateLimiter::for('email-check', function (Request $request) {
-    return Limit::perMinute(5)->by($request->ip());
-});
-```
+The `email-check` limiter (a per-minute burst cap plus a looser hourly cap, keyed
+per IP) is registered in `app/Providers/AppServiceProvider.php` (in `boot()`,
+alongside the other named limiters). Its thresholds are declared in
+`config/rate_limits.php` under the `email_check` key rather than hardcoded — that
+config file is the single source of truth for all rate limits and is where to
+tune values.
 
 This caps bulk scraping but does not stop a patient attacker from probing
-individual emails.
+individual emails one at a time.
 
 ### Related endpoints that already avoid disclosure
 
@@ -310,7 +308,8 @@ it when presence-privacy becomes a hard requirement.
 - `app/Sync/Controllers/AuthController.php` — `checkEmail()`,
   `resolveAuthNextStep()`, `register()`, `login()`, `forgotPassword()`.
 - `routes/sync.php` — `/auth/check`, `/register`, `/login` routes and throttles.
-- `app/Providers/AppServiceProvider.php` — `email-check` rate limiter.
+- `app/Providers/AppServiceProvider.php` — registers the named rate limiters.
+- `config/rate_limits.php` — declarative thresholds for all rate limiters.
 - `app/Http/Controllers/Auth/RegisteredUserController.php` —
   `validateRegistration()`, `guardAgainstBots()`.
 - `app/Models/User.php` — `MustVerifyEmail`, and the social-auth placeholder

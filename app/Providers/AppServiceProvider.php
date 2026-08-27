@@ -43,55 +43,42 @@ class AppServiceProvider extends ServiceProvider
             return $athleteUrl . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
         });
 
-        // Register rate limiters for the Sync API
+        // All named rate limiters read their thresholds from config/rate_limits.php
+        // so limits live in one declarative place rather than as literals here.
+
+        // Sync API general throttles.
         RateLimiter::for('sync-per-user', function (Request $request) {
-            return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
+            return $this->buildLimits('sync_per_user', $request->user()?->id ?: $request->ip());
         });
 
         RateLimiter::for('sync-global', function (Request $request) {
-            return Limit::perMinute(60);
+            return $this->buildLimits('sync_global', null);
         });
 
         RateLimiter::for('sync-batch', function (Request $request) {
-            return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
+            return $this->buildLimits('sync_batch', $request->user()?->id ?: $request->ip());
         });
 
-        // Throttle connection-token redemption to make the 6-digit code
-        // infeasible to brute-force (10^6 space, 1-hour validity).
+        // Connection-token redemption. Keyed per authenticated user.
         RateLimiter::for('connection-attempts', function (Request $request) {
-            return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
+            return $this->buildLimits('connection_attempts', $request->user()?->id ?: $request->ip());
         });
 
-        // Registration: a tight burst limit plus a looser hourly cap to slow
-        // paced mass account creation. Keyed per IP.
+        // Registration. Keyed per IP.
         RateLimiter::for('register', function (Request $request) {
-            return [
-                Limit::perMinute(2)->by($request->ip()),
-                Limit::perHour(5)->by($request->ip()),
-            ];
+            return $this->buildLimits('register', $request->ip());
         });
 
-        // Login: burst limit plus an hourly cap to slow sustained brute force.
-        // Keyed per email + IP so one struggling user (or shared NAT IP) is not
-        // locked out by unrelated traffic, and an attacker spreading across many
-        // emails is still caught per email.
+        // Login. Keyed per email + IP.
         RateLimiter::for('login', function (Request $request) {
             $key = strtolower((string) $request->input('email')) . '|' . $request->ip();
 
-            return [
-                Limit::perMinute(2)->by($key),
-                Limit::perHour(20)->by($key),
-            ];
+            return $this->buildLimits('login', $key);
         });
 
-        // Throttle the unauthenticated email-check endpoint (per IP) to prevent
-        // bulk account enumeration / scraping. The hourly cap targets slow,
-        // patient scraping that stays under the per-minute limit.
+        // Unauthenticated email-check endpoint. Keyed per IP.
         RateLimiter::for('email-check', function (Request $request) {
-            return [
-                Limit::perMinute(5)->by($request->ip()),
-                Limit::perHour(30)->by($request->ip()),
-            ];
+            return $this->buildLimits('email_check', $request->ip());
         });
 
         // Register observers
@@ -168,5 +155,32 @@ class AppServiceProvider extends ServiceProvider
                 $view->with('logs', self::$capturedLogs);
             }
         });
+    }
+
+    /**
+     * Build the Limit objects for a named limiter from config/rate_limits.php.
+     *
+     * Reads `per_minute` (required) and `per_hour` (optional) for the given
+     * config key and applies the same throttle key to each window. A null or
+     * missing window is skipped.
+     *
+     * @return array<int, \Illuminate\Cache\RateLimiting\Limit>
+     */
+    private function buildLimits(string $key, int|string|null $by): array
+    {
+        $config = config("rate_limits.{$key}", []);
+        $limits = [];
+
+        if (! empty($config['per_minute'])) {
+            $limit = Limit::perMinute($config['per_minute']);
+            $limits[] = $by === null ? $limit : $limit->by($by);
+        }
+
+        if (! empty($config['per_hour'])) {
+            $limit = Limit::perHour($config['per_hour']);
+            $limits[] = $by === null ? $limit : $limit->by($by);
+        }
+
+        return $limits;
     }
 }
