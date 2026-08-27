@@ -31,6 +31,9 @@ class RegisteredUserController extends Controller
      */
     public function store(Request $request, UserSeederService $userSeederService): RedirectResponse
     {
+        // Reject automated/bot submissions before any other processing.
+        $this->guardAgainstBots($request);
+
         // Custom validation to handle soft-deleted users
         $this->validateRegistration($request);
 
@@ -51,6 +54,48 @@ class RegisteredUserController extends Controller
         Auth::login($user);
 
         return redirect(route('mobile-entry.lifts', absolute: false));
+    }
+
+    /**
+     * Reject bot submissions via a honeypot field and a minimum fill-time check.
+     *
+     * The 'website' field is hidden from real users, so any value indicates a bot.
+     * The encrypted 'form_loaded_at' timestamp lets us reject submissions completed
+     * faster than a human plausibly could. Both failures return a generic error so
+     * bots cannot learn which check caught them.
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    private function guardAgainstBots(Request $request): void
+    {
+        $failed = false;
+
+        // The decoy field is invisible to real users; any value indicates a bot.
+        if (filled($request->input('website'))) {
+            $failed = true;
+        }
+
+        // The timing check only applies when the form supplied a timestamp. A
+        // present-but-tampered value fails; a submission faster than a human
+        // could plausibly complete the form fails. A missing timestamp is not
+        // treated as a failure so that non-browser flows are not falsely blocked.
+        if ($request->filled('form_loaded_at')) {
+            try {
+                $loadedAt = (int) decrypt($request->input('form_loaded_at'));
+
+                if ((now()->timestamp - $loadedAt) < 2) {
+                    $failed = true;
+                }
+            } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+                $failed = true;
+            }
+        }
+
+        if ($failed) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'email' => 'Your registration could not be processed. Please try again.',
+            ]);
+        }
     }
 
     /**

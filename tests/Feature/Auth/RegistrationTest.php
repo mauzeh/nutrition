@@ -515,6 +515,12 @@ class RegistrationTest extends TestCase
 
     public function test_multiple_failed_registration_attempts_with_same_email(): void
     {
+        // This test makes several rapid attempts to exercise validation behavior
+        // across retries. The register route is now rate limited (throttle:2,1),
+        // so disable that middleware here to isolate the validation behavior under
+        // test; throttling itself is covered by test_registration_route_is_rate_limited.
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
+
         // First attempt - should fail due to missing name
         $response1 = $this->post('/register', [
             'email' => 'test@example.com',
@@ -746,5 +752,96 @@ class RegistrationTest extends TestCase
                    $mail->newUser->email === 'john.doe@example.com' &&
                    $mail->envelope()->subject === 'New User Registration - John Doe';
         });
+    }
+
+    // Honeypot / Bot Protection Tests
+
+    public function test_registration_rejects_filled_honeypot_field(): void
+    {
+        $initialUserCount = User::count();
+
+        $response = $this->post('/register', [
+            'name' => 'Bot User',
+            'email' => 'bot@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'website' => 'http://spam.example.com', // honeypot: real users never fill this
+        ]);
+
+        $response->assertSessionHasErrors('email');
+        $this->assertGuest();
+        $this->assertEquals($initialUserCount, User::count());
+        $this->assertDatabaseMissing('users', ['email' => 'bot@example.com']);
+    }
+
+    public function test_registration_rejects_submission_faster_than_minimum_fill_time(): void
+    {
+        $initialUserCount = User::count();
+
+        $response = $this->post('/register', [
+            'name' => 'Speedy Bot',
+            'email' => 'speedy@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'form_loaded_at' => encrypt(now()->timestamp), // submitted instantly
+        ]);
+
+        $response->assertSessionHasErrors('email');
+        $this->assertGuest();
+        $this->assertEquals($initialUserCount, User::count());
+    }
+
+    public function test_registration_rejects_tampered_timestamp(): void
+    {
+        $response = $this->post('/register', [
+            'name' => 'Tamper Bot',
+            'email' => 'tamper@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'form_loaded_at' => 'not-a-valid-encrypted-value',
+        ]);
+
+        $response->assertSessionHasErrors('email');
+        $this->assertGuest();
+    }
+
+    public function test_registration_succeeds_with_valid_honeypot_fields(): void
+    {
+        $this->seedRequiredData();
+
+        $response = $this->post('/register', [
+            'name' => 'Real User',
+            'email' => 'real@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'website' => '', // empty decoy
+            'form_loaded_at' => encrypt(now()->subSeconds(10)->timestamp), // filled 10s ago
+        ]);
+
+        $this->assertAuthenticated();
+        $response->assertRedirect(route('mobile-entry.lifts', absolute: false));
+        $this->assertDatabaseHas('users', ['email' => 'real@example.com']);
+    }
+
+    public function test_registration_route_is_rate_limited(): void
+    {
+        // The route allows 2 requests per minute; the 3rd should be throttled (429).
+        for ($i = 0; $i < 2; $i++) {
+            $this->post('/register', [
+                'name' => 'Test User',
+                'email' => "invalid-email-{$i}", // invalid so no account is created
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ]);
+        }
+
+        $response = $this->post('/register', [
+            'name' => 'Test User',
+            'email' => 'invalid-email-3',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ]);
+
+        $response->assertStatus(429);
     }
 }

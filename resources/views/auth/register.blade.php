@@ -26,6 +26,14 @@
     <form method="POST" action="{{ route('register') }}" class="login-form">
         @csrf
 
+        {{-- Honeypot: hidden from real users, bots tend to fill it. Leave empty. --}}
+        <div aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;height:0;width:0;overflow:hidden;">
+            <label for="website">Website</label>
+            <input id="website" type="text" name="website" value="" tabindex="-1" autocomplete="off" />
+        </div>
+        {{-- Timestamp: submissions faster than a human can fill the form are rejected. --}}
+        <input type="hidden" name="form_loaded_at" value="{{ encrypt(now()->timestamp) }}" />
+
         <!-- Name -->
         <div class="login-form-group">
             <label for="name">Name</label>

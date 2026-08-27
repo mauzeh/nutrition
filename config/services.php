@@ -59,6 +59,17 @@ return [
 
     'athlete' => [
         'url' => env('ATHLETE_APP_URL', 'https://flagship.squirby.ai'),
+
+        // Allowlist of hosts the OAuth callback is permitted to redirect back to.
+        // A state-supplied redirect URL is only honored if its host appears here
+        // (the configured 'url' host above is always allowed); otherwise the
+        // configured 'url' is used. This prevents an attacker from crafting the
+        // (unsigned) OAuth state to exfiltrate the issued token to their own host.
+        // Defaults cover the known athlete origins; override via env (comma-separated).
+        'allowed_redirect_hosts' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('ATHLETE_ALLOWED_REDIRECT_HOSTS', 'squirby.app,flagship.squirby.ai,localhost'))
+        ))),
     ],
 
 ];

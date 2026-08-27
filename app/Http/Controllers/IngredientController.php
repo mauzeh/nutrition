@@ -127,7 +127,7 @@ class IngredientController extends Controller
             'cost_per_unit' => 'required|numeric|min:0',
         ]);
 
-        $data = $request->except('calories');
+        $data = $request->except('calories', 'user_id');
         $ingredient = Ingredient::create(array_merge($data, ['user_id' => auth()->id()]));
 
         // Handle redirect parameters from meal ingredient selection
@@ -200,7 +200,7 @@ class IngredientController extends Controller
             'cost_per_unit' => 'required|numeric|min:0',
         ]);
 
-        $data = $request->except('calories');
+        $data = $request->except('calories', 'user_id');
         $ingredient->update($data);
 
         return redirect()->route('ingredients.index')

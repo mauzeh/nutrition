@@ -149,11 +149,16 @@ class ProfileTest extends TestCase
     {
         $user = User::factory()->create();
 
+        // Keep the same email so email verification is not reset. Changing the
+        // email nulls email_verified_at, which (with the 'verified' middleware
+        // now enforced) would redirect /profile to the verification notice
+        // instead of showing the success flash. That re-verification behavior
+        // is covered by test_updating_email_requires_reverification below.
         $response = $this
             ->actingAs($user)
             ->patch('/profile', [
                 'name' => 'Updated Name',
-                'email' => 'updated@example.com',
+                'email' => $user->email,
             ]);
 
         $response
@@ -163,6 +168,24 @@ class ProfileTest extends TestCase
         // Follow the redirect and assert the success message on the page
         $response = $this->actingAs($user)->get('/profile');
         $response->assertSee('Profile information updated successfully.');
+    }
+
+    /** @test */
+    public function test_updating_email_requires_reverification(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->patch('/profile', [
+            'name' => 'Updated Name',
+            'email' => 'updated@example.com',
+        ])->assertRedirect('/profile');
+
+        // Email change resets verification status...
+        $this->assertNull($user->refresh()->email_verified_at);
+
+        // ...and the now-unverified user is bounced to the verification notice.
+        $this->actingAs($user)->get('/profile')
+            ->assertRedirect(route('verification.notice'));
     }
 
     /** @test */

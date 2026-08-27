@@ -253,6 +253,38 @@ class GoogleOAuthRedirectTest extends TestCase
         $response->assertRedirect('https://squirby.app/auth/callback?error=google_auth_failed');
     }
 
+    public function test_google_callback_rejects_attacker_controlled_redirect_host(): void
+    {
+        $googleUser = Mockery::mock(SocialiteUser::class);
+        $googleUser->shouldReceive('getEmail')->andReturn('victim@example.com');
+        $googleUser->shouldReceive('getName')->andReturn('Victim');
+        $googleUser->shouldReceive('getId')->andReturn('google-sub-evil');
+
+        Socialite::shouldReceive('driver')->with('google')->once()->andReturnSelf();
+        Socialite::shouldReceive('stateless')->once()->andReturnSelf();
+        Socialite::shouldReceive('redirectUrl')->once()->andReturnSelf();
+        Socialite::shouldReceive('user')->once()->andReturn($googleUser);
+
+        // Attacker crafts the (unsigned) state to point the token at their host.
+        $state = base64_encode(json_encode([
+            'device_id' => 'test-device',
+            'athlete_url' => 'https://evil.example.com',
+        ]));
+
+        $response = $this->get('/api/sync/auth/google/callback?state=' . $state . '&code=mock-code');
+
+        $response->assertRedirect();
+        $redirectUrl = $response->headers->get('Location');
+
+        // The token must NOT be delivered to the attacker host; it falls back to
+        // the configured athlete URL instead.
+        $this->assertStringNotContainsString('evil.example.com', $redirectUrl);
+        $this->assertStringStartsWith(
+            config('services.athlete.url') . '/auth/callback?',
+            $redirectUrl
+        );
+    }
+
     public function test_google_callback_uses_default_athlete_url_when_state_missing(): void
     {
         Socialite::shouldReceive('driver')

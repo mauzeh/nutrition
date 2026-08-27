@@ -29,7 +29,7 @@ Route::get('/', function () {
 
 
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
     // Breeze Profile Routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::get('/profile/preferences', [ProfileController::class, 'editPreferences'])->name('profile.edit-preferences');
@@ -169,11 +169,10 @@ Route::get('/debug/email', [DebugController::class, 'previewFirstLiftEmail']);
 
 require __DIR__.'/auth.php';
 
-Route::middleware(['auth', 'admin'])->group(function () {
+Route::middleware(['auth', 'verified', 'admin'])->group(function () {
     Route::resource('users', UserController::class);
     Route::get('users/{user}/impersonate', [UserController::class, 'impersonate'])->name('users.impersonate');
 });
 
 Route::get('users/impersonate/leave', [UserController::class, 'leaveImpersonate'])->name('users.leave-impersonate');
-Route::get('lift-logs/quick-add/{exercise}/{date}', [LiftLogController::class, 'quickAdd'])->name('lift-logs.quick-add');
 Route::get('/magic-login/{token}', [App\Http\Controllers\MagicLoginController::class, 'login']);

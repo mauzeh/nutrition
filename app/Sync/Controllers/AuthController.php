@@ -89,9 +89,11 @@ class AuthController
      */
     public function googleCallback(Request $request)
     {
-        // Decode state passed through the OAuth flow
+        // Decode state passed through the OAuth flow. The state is unsigned and
+        // therefore attacker-controllable, so the redirect target it carries must
+        // be validated against an allowlist before we redirect the issued token.
         $state = json_decode(base64_decode($request->query('state', '')), true) ?? [];
-        $athleteUrl = $state['athlete_url'] ?? config('services.athlete.url', 'https://squirby.app');
+        $athleteUrl = $this->resolveSafeRedirectUrl($state['athlete_url'] ?? null);
         $deviceId = $state['device_id'] ?? 'athlete-pwa';
 
         try {
@@ -232,6 +234,43 @@ class AuthController
             'status' => 'error',
             'message' => __($status),
         ], 422);
+    }
+
+    /**
+     * Resolve a safe redirect base URL for the OAuth callback.
+     *
+     * The configured athlete URL is always trusted. A state-supplied URL is only
+     * honored when its host matches the configured URL's host or appears in the
+     * services.athlete.allowed_redirect_hosts allowlist. Anything else falls back
+     * to the configured default so an unsigned state cannot redirect the token
+     * to an attacker-controlled origin.
+     */
+    private function resolveSafeRedirectUrl(?string $candidate): string
+    {
+        $default = config('services.athlete.url', 'https://flagship.squirby.ai');
+
+        if (empty($candidate) || ! is_string($candidate)) {
+            return $default;
+        }
+
+        $candidateHost = parse_url($candidate, PHP_URL_HOST);
+
+        if (empty($candidateHost)) {
+            return $default;
+        }
+
+        $allowedHosts = config('services.athlete.allowed_redirect_hosts', []);
+        $defaultHost = parse_url($default, PHP_URL_HOST);
+
+        if ($defaultHost) {
+            $allowedHosts[] = $defaultHost;
+        }
+
+        if (in_array($candidateHost, $allowedHosts, true)) {
+            return $candidate;
+        }
+
+        return $default;
     }
 
     /**
