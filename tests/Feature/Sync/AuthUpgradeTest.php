@@ -328,4 +328,24 @@ class AuthUpgradeTest extends TestCase
                 'next_step' => 'google',
             ]);
     }
+
+    /**
+     * Test email check is rate limited per hour (slow scraping).
+     */
+    public function test_email_check_is_rate_limited_per_hour(): void
+    {
+        // Space checks 20s apart: under the 5/min burst cap, but all 31 land
+        // within the hour so the 30/hour cap trips on the 31st.
+        for ($i = 0; $i < 30; $i++) {
+            $this->travel(20)->seconds();
+            $this->postJson('/api/sync/auth/check', [
+                'email' => "probe-{$i}@example.com",
+            ])->assertStatus(200);
+        }
+
+        $this->travel(20)->seconds();
+        $this->postJson('/api/sync/auth/check', [
+            'email' => 'probe-final@example.com',
+        ])->assertStatus(429);
+    }
 }

@@ -844,4 +844,28 @@ class RegistrationTest extends TestCase
 
         $response->assertStatus(429);
     }
+
+    public function test_registration_route_is_rate_limited_per_hour(): void
+    {
+        // Space attempts 70s apart: over the 60s per-minute window so the 2/min
+        // burst cap never trips, but all 6 attempts land within the hour so the
+        // 5/hour cap trips on the 6th.
+        for ($i = 0; $i < 5; $i++) {
+            $this->travel(70)->seconds();
+            $this->post('/register', [
+                'name' => 'Test User',
+                'email' => "invalid-email-{$i}", // invalid so no account is created
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ])->assertSessionHasErrors('email'); // validation failure, not throttled
+        }
+
+        $this->travel(70)->seconds();
+        $this->post('/register', [
+            'name' => 'Test User',
+            'email' => 'invalid-email-6',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ])->assertStatus(429);
+    }
 }

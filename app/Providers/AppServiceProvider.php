@@ -62,10 +62,36 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
         });
 
+        // Registration: a tight burst limit plus a looser hourly cap to slow
+        // paced mass account creation. Keyed per IP.
+        RateLimiter::for('register', function (Request $request) {
+            return [
+                Limit::perMinute(2)->by($request->ip()),
+                Limit::perHour(5)->by($request->ip()),
+            ];
+        });
+
+        // Login: burst limit plus an hourly cap to slow sustained brute force.
+        // Keyed per email + IP so one struggling user (or shared NAT IP) is not
+        // locked out by unrelated traffic, and an attacker spreading across many
+        // emails is still caught per email.
+        RateLimiter::for('login', function (Request $request) {
+            $key = strtolower((string) $request->input('email')) . '|' . $request->ip();
+
+            return [
+                Limit::perMinute(2)->by($key),
+                Limit::perHour(20)->by($key),
+            ];
+        });
+
         // Throttle the unauthenticated email-check endpoint (per IP) to prevent
-        // bulk account enumeration / scraping.
+        // bulk account enumeration / scraping. The hourly cap targets slow,
+        // patient scraping that stays under the per-minute limit.
         RateLimiter::for('email-check', function (Request $request) {
-            return Limit::perMinute(5)->by($request->ip());
+            return [
+                Limit::perMinute(5)->by($request->ip()),
+                Limit::perHour(30)->by($request->ip()),
+            ];
         });
 
         // Register observers

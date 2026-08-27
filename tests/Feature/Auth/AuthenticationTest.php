@@ -68,4 +68,58 @@ class AuthenticationTest extends TestCase
         $this->assertGuest();
         $response->assertRedirect('/');
     }
+
+    public function test_login_is_rate_limited_per_minute(): void
+    {
+        // The burst limit allows 2 attempts/min for a given email+IP; the 3rd
+        // is throttled regardless of credential validity.
+        for ($i = 0; $i < 2; $i++) {
+            $this->post('/login', [
+                'email' => 'target@example.com',
+                'password' => 'wrong-password',
+            ]);
+        }
+
+        $this->post('/login', [
+            'email' => 'target@example.com',
+            'password' => 'wrong-password',
+        ])->assertStatus(429);
+    }
+
+    public function test_login_is_rate_limited_per_hour(): void
+    {
+        // Space attempts 90s apart: under the 2/min burst cap, and far enough
+        // apart that Breeze's own 5-failure limiter (60s decay) never trips,
+        // yet all 21 attempts fall within one hour so the 20/hour cap trips.
+        for ($i = 0; $i < 20; $i++) {
+            $this->travel(90)->seconds();
+            $this->post('/login', [
+                'email' => 'slow@example.com',
+                'password' => 'wrong-password',
+            ])->assertStatus(302); // failed login redirect, not throttled
+        }
+
+        $this->travel(90)->seconds();
+        $this->post('/login', [
+            'email' => 'slow@example.com',
+            'password' => 'wrong-password',
+        ])->assertStatus(429);
+    }
+
+    public function test_login_rate_limit_is_scoped_per_email(): void
+    {
+        // Exhaust the per-minute burst for one email.
+        for ($i = 0; $i < 3; $i++) {
+            $this->post('/login', [
+                'email' => 'victim@example.com',
+                'password' => 'wrong-password',
+            ]);
+        }
+
+        // A different email from the same IP must not be locked out.
+        $this->post('/login', [
+            'email' => 'someone-else@example.com',
+            'password' => 'wrong-password',
+        ])->assertStatus(302);
+    }
 }

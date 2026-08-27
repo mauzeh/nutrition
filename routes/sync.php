@@ -8,8 +8,8 @@ use App\Sync\Controllers\PreferencesController;
 use App\Sync\Controllers\RestoreController;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:2,1');
-Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:2,1');
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 Route::get('/auth/google/redirect', [AuthController::class, 'googleRedirect']);
 Route::get('/auth/google/callback', [AuthController::class, 'googleCallback']);
 Route::post('/auth/apple', [AuthController::class, 'appleAuth']);
