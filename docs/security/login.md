@@ -1,13 +1,11 @@
 # Login & Account-Existence Disclosure
 
-This document describes how the app currently discloses whether an account exists
-for a given email, why that is a privacy/security concern, and how to move to a
-stricter "no synchronous disclosure" model (referred to here as **Option 3**) in
-the future.
+This document describes how the app discloses whether an account exists for a
+given email, why that is a privacy/security concern, and how to move to a
+stricter model that discloses nothing synchronously.
 
-It is written for engineers who did not build the current auth flow. Read the
-"How it works today" section first, then the risk analysis, then the Option 3
-implementation plan.
+It is written for engineers who did not build the auth flow. Read "How it works
+today" first, then the risk analysis, then the hardening plan.
 
 ---
 
@@ -52,11 +50,13 @@ a single routing hint produced by `resolveAuthNextStep()` (around line 185):
 
 The athlete app calls this after the user types their email, then shows the
 appropriate screen (password field, "Continue with Google", or the signup form).
+This gives returning users a friendly path: someone who registered long ago via
+Google is routed to "Continue with Google" instead of accidentally creating a
+duplicate account.
 
-**This is the current state after "Option 2".** Previously the endpoint returned
-three separate booleans — `exists`, `has_password`, and `has_google` — which was a
-cleaner enumeration oracle. That shape has been collapsed into the single
-`next_step` hint, and the route is now rate limited.
+The endpoint returns a single `next_step` hint rather than separate `exists` /
+`has_password` / `has_google` booleans, specifically so it is not a clean
+boolean oracle, and the route is rate limited (see below).
 
 ### Rate limiting
 
@@ -79,7 +79,7 @@ deliberately returns the same response whether or not the account exists:
 
 > "If an account exists with that email, a reset link has been sent."
 
-This is the anti-enumeration pattern we would extend to signup under Option 3.
+This is the anti-enumeration pattern the hardening plan below extends to signup.
 
 ### Registration disclosure (web)
 
@@ -92,15 +92,14 @@ The web registration flow in
 - success
 
 That difference is itself a (smaller) enumeration signal on the web surface and
-is called out again in the Option 3 plan below.
+is addressed again in the hardening plan below.
 
 ---
 
 ## The risk
 
-`next_step` (and, before Option 2, the boolean triplet) is an **account-existence
-oracle**: anyone, unauthenticated, can learn whether a given email has an account
-and which sign-in method it uses.
+`next_step` is an **account-existence oracle**: anyone, unauthenticated, can
+learn whether a given email has an account and which sign-in method it uses.
 
 Concrete concerns:
 
@@ -111,18 +110,22 @@ Concrete concerns:
    attack: credential stuffing against `password` accounts, or OAuth-consent
    phishing against `google` accounts.
 3. **Scale.** Without disclosure controls, the endpoint can be scraped to build a
-   membership list. Rate limiting (Option 2) raises the cost but does not remove
-   the oracle — one request per email still answers the question.
+   membership list. Rate limiting raises the cost but does not remove the
+   oracle — one request per email still answers the question.
 
-The fundamental limitation of Option 2: **you cannot both hide account existence
-from an attacker and reveal it to a user through the same unauthenticated,
-synchronous endpoint.** The response is the disclosure. Option 3 removes the
-synchronous disclosure entirely and moves the "you already have an account" help
-into a channel only the real inbox owner can read: email.
+The fundamental limitation of the current approach: **you cannot both hide
+account existence from an attacker and reveal it to a user through the same
+unauthenticated, synchronous endpoint.** The response *is* the disclosure.
+
+The current design is deliberate harm-reduction: it removes the clean boolean
+oracle and stops bulk scraping, while keeping the instant, friendly routing for
+returning users. It accepts that a determined attacker can still learn existence
+one email at a time. The plan below removes that residual disclosure at the cost
+of an email round-trip on signup and coordinated client changes.
 
 ---
 
-## Option 3: no synchronous disclosure
+## Hardening plan: no synchronous disclosure
 
 **Goal:** the API never tells an unauthenticated caller whether an account
 exists. The "you already registered, here's how to sign in" experience is
@@ -211,7 +214,7 @@ In `RegisteredUserController::validateRegistration()`
 
 > Note: this changes the web signup UX from "instant account + login" to
 > "confirm via email first." That is a product decision. It also interacts with
-> the `MustVerifyEmail` enforcement already in place (`app/Models/User.php`
+> the email-verification enforcement already in place (`app/Models/User.php`
 > implements `MustVerifyEmail`; the `verified` middleware guards the main route
 > groups in `routes/web.php`).
 
@@ -244,7 +247,7 @@ verify no upstream layer adds method-specific detail.)
 
 ### Athlete app changes (client)
 
-Option 3 requires client coordination, because the app currently branches on
+This plan requires client coordination, because the app currently branches on
 `next_step`:
 
 - Replace the "type email → we tell you which screen" flow with a combined
@@ -252,7 +255,7 @@ Option 3 requires client coordination, because the app currently branches on
   "Create account" action), OR keep asking for the email but always proceed to a
   single next screen without server-provided branching.
 - Handle the new signup response: show "check your inbox" instead of logging the
-  user straight in (if step 2/3 defer login to post-confirmation).
+  user straight in (if steps 2/3 defer login to post-confirmation).
 
 Ship the client change **before** removing or neutralizing `checkEmail`, or
 version the endpoint, to avoid breaking older app builds.
@@ -271,12 +274,12 @@ Add feature tests asserting the disclosure is gone:
 - The correct mailable is queued in each branch (`Mail::fake()` +
   `Mail::assertQueued`), without the HTTP response revealing which.
 
-Existing tests that will need updating (they currently assert the disclosing
+Existing tests that will need updating (they currently assert disclosing
 behavior or the `next_step` hint):
 
 - `tests/Feature/Sync/AuthUpgradeTest.php` — `test_email_check_nonexistent`,
-  `test_email_check_existing` assert `next_step`. Under Option 3 they must assert
-  the neutral, identical response.
+  `test_email_check_existing` assert `next_step`. They must instead assert the
+  neutral, identical response.
 - `tests/Feature/Auth/RegistrationTest.php` — several tests assert the
   distinguishable "email already taken" / soft-deleted errors and immediate
   authentication after signup. These encode the current web behavior and must be
@@ -287,18 +290,20 @@ the workspace rule on altering existing tests).
 
 ---
 
-## Summary
+## Trade-off summary
 
-| | Discloses existence? | UX for returning users | Client change | Effort |
-|---|---|---|---|---|
-| **Option 2 (current)** | Yes (via `next_step`), rate limited | Instant, friendly routing | none | done |
-| **Option 3 (future)** | No (moved to email) | "Check your inbox", email guides them | required | larger |
+| | Current design | No-disclosure design |
+|---|---|---|
+| Discloses existence? | Yes (via `next_step`), rate limited | No (moved to email) |
+| UX for returning users | Instant, friendly routing | "Check your inbox", email guides them |
+| Client change required | none | yes |
+| Relative effort | in place | larger |
 
-Option 2 is harm-reduction: it removes the clean boolean oracle and stops bulk
-scraping, but a determined attacker can still learn existence one email at a
-time. Option 3 eliminates synchronous disclosure at the cost of an email
-round-trip on signup and coordinated client changes. Choose Option 3 when
-presence-privacy becomes a hard requirement.
+The current design is harm-reduction: it removes the clean boolean oracle and
+stops bulk scraping, but a determined attacker can still learn existence one
+email at a time. The no-disclosure design eliminates synchronous disclosure at
+the cost of an email round-trip on signup and coordinated client changes. Adopt
+it when presence-privacy becomes a hard requirement.
 
 ### Key source references
 
