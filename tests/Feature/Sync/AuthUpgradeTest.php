@@ -281,8 +281,12 @@ class AuthUpgradeTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'status' => 'ok',
-                'exists' => false,
-            ]);
+                'next_step' => 'register',
+            ])
+            // The response must not expose a clean existence/method oracle.
+            ->assertJsonMissingPath('exists')
+            ->assertJsonMissingPath('has_password')
+            ->assertJsonMissingPath('has_google');
     }
 
     /**
@@ -304,9 +308,7 @@ class AuthUpgradeTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'status' => 'ok',
-                'exists' => true,
-                'has_password' => true,
-                'has_google' => false,
+                'next_step' => 'password',
             ]);
 
         // 2. Existing user with Google only
@@ -323,9 +325,7 @@ class AuthUpgradeTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'status' => 'ok',
-                'exists' => true,
-                'has_password' => false,
-                'has_google' => true,
+                'next_step' => 'google',
             ]);
     }
 }

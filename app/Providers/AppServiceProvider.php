@@ -56,6 +56,18 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
         });
 
+        // Throttle connection-token redemption to make the 6-digit code
+        // infeasible to brute-force (10^6 space, 1-hour validity).
+        RateLimiter::for('connection-attempts', function (Request $request) {
+            return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Throttle the unauthenticated email-check endpoint (per IP) to prevent
+        // bulk account enumeration / scraping.
+        RateLimiter::for('email-check', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
+
         // Register observers
         PRComment::observe(PRCommentObserver::class);
         PRHighFive::observe(PRHighFiveObserver::class);

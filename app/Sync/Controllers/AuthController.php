@@ -163,21 +163,46 @@ class AuthController
 
         $user = User::where('email', $validated['email'])->first();
 
-        if ($user) {
-            $hasRealPassword = ! is_null($user->password) && $user->password !== '' && ! Hash::check('social-auth-placeholder-value', $user->password);
-
-            return response()->json([
-                'status' => 'ok',
-                'exists' => true,
-                'has_password' => $hasRealPassword,
-                'has_google' => ! is_null($user->google_id),
-            ]);
-        }
-
         return response()->json([
             'status' => 'ok',
-            'exists' => false,
+            'next_step' => $this->resolveAuthNextStep($user),
         ]);
+    }
+
+    /**
+     * Resolve the auth screen the client should route the user to.
+     *
+     * Returns a single hint rather than exposing separate exists / has_password /
+     * has_google booleans, so the endpoint is not a clean account-enumeration
+     * oracle. Combined with rate limiting on the route, this limits how much an
+     * attacker can learn while still letting the app route returning users to the
+     * right sign-in method.
+     *
+     * - 'password': an existing account that can sign in with a password
+     * - 'google':   an existing account that authenticates via Google only
+     * - 'register': no account matched; the user should create one
+     */
+    private function resolveAuthNextStep(?User $user): string
+    {
+        if (! $user) {
+            return 'register';
+        }
+
+        $hasRealPassword = ! is_null($user->password)
+            && $user->password !== ''
+            && ! Hash::check('social-auth-placeholder-value', $user->password);
+
+        if ($hasRealPassword) {
+            return 'password';
+        }
+
+        if (! is_null($user->google_id)) {
+            return 'google';
+        }
+
+        // Account exists but has neither a usable password nor Google link;
+        // routing to password lets them recover via the forgot-password flow.
+        return 'password';
     }
 
     /**

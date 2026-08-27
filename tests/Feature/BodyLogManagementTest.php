@@ -65,6 +65,26 @@ class BodyLogManagementTest extends TestCase
     }
 
     /** @test */
+    public function user_cannot_view_the_show_by_type_page_for_another_users_measurement_type()
+    {
+        $owner = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        // A measurement type belonging to someone else. Its name must not leak.
+        $othersType = MeasurementType::factory()->create([
+            'user_id' => $owner->id,
+            'name' => 'Secret Measurement',
+        ]);
+
+        $this->actingAs($otherUser);
+
+        $response = $this->get(route('body-logs.show-by-type', $othersType));
+
+        $response->assertForbidden();
+        $response->assertDontSee('Secret Measurement');
+    }
+
+    /** @test */
     public function authenticated_user_can_pre_select_measurement_type_in_body_log_form()
     {
         $user = User::factory()->create();

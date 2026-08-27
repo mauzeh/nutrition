@@ -13,7 +13,7 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:2,
 Route::get('/auth/google/redirect', [AuthController::class, 'googleRedirect']);
 Route::get('/auth/google/callback', [AuthController::class, 'googleCallback']);
 Route::post('/auth/apple', [AuthController::class, 'appleAuth']);
-Route::post('/auth/check', [AuthController::class, 'checkEmail']);
+Route::post('/auth/check', [AuthController::class, 'checkEmail'])->middleware('throttle:email-check');
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 

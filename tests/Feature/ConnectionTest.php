@@ -288,4 +288,20 @@ class ConnectionTest extends TestCase
         $this->assertTrue($user2->isFollowing($user1));
         $this->assertTrue($user1->isFollowing($user2));
     }
+
+    public function test_connection_attempts_are_rate_limited(): void
+    {
+        $attacker = User::factory()->create();
+        $this->actingAs($attacker);
+
+        // The limiter allows 10 attempts per minute; the 11th must be throttled,
+        // making the 6-digit code space infeasible to brute-force.
+        for ($i = 0; $i < 10; $i++) {
+            $this->post(route('connections.connect', ['token' => '000000']))
+                ->assertRedirect(route('connections.index'));
+        }
+
+        $this->post(route('connections.connect', ['token' => '000000']))
+            ->assertStatus(429);
+    }
 }

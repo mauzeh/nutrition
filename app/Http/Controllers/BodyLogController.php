@@ -145,6 +145,10 @@ class BodyLogController extends Controller
 
     public function showByType(MeasurementType $measurementType)
     {
+        if ($measurementType->user_id !== auth()->id()) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $bodyLogs = BodyLog::where('measurement_type_id', $measurementType->id)
             ->where('user_id', auth()->id())
             ->orderBy('logged_at', 'desc')
