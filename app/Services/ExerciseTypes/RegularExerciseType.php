@@ -267,15 +267,21 @@ class RegularExerciseType extends BaseExerciseType
         foreach ($currentMetrics['rep_weights'] as $reps => $weight) {
             $previousBestResult = $this->getBestWeightForReps($previousLogs, $reps, $targetUnit);
             
-            // No previous best at this rep count — first time is always a PR
+            // No previous best at this rep count — first time is a PR ONLY if it
+            // isn't dominated by a heavier-or-equal lift at a higher rep count.
+            // e.g. 115×3 is NOT a PR when history already has 115×4 (more reps at
+            // the same weight is strictly harder). Mirrors the Athlete-side rule in
+            // athlete/src/shared/logging/pr/weightliftingPRs.js (isDominatedByHigherReps).
             if ($previousBestResult['weight'] == 0) {
-                $prs[] = [
-                    'type' => 'rep_specific',
-                    'rep_count' => $reps,
-                    'value' => $weight,
-                    'previous_value' => null,
-                    'previous_lift_log_id' => null,
-                ];
+                if (!$this->isDominatedByHigherReps($previousLogs, (int) $reps, $weight, $targetUnit, $tolerance)) {
+                    $prs[] = [
+                        'type' => 'rep_specific',
+                        'rep_count' => $reps,
+                        'value' => $weight,
+                        'previous_value' => null,
+                        'previous_lift_log_id' => null,
+                    ];
+                }
                 continue;
             }
             
@@ -507,6 +513,28 @@ class RegularExerciseType extends BaseExerciseType
         }
         
         return ['weight' => $maxWeight, 'lift_log_id' => $liftLogId];
+    }
+    
+    /**
+     * Determine whether a rep-specific attempt is "dominated" by a previous lift
+     * at a HIGHER rep count with weight >= (attemptWeight - tolerance).
+     *
+     * A heavier-or-equal weight lifted for more reps is strictly harder, so the
+     * current attempt at fewer reps is not a genuine rep-specific PR. Only rep
+     * counts up to 10 are considered rep-specific (matching calculateCurrentMetrics).
+     *
+     * Mirrors the Athlete-side contract in
+     * athlete/src/shared/logging/pr/weightliftingPRs.js (isDominatedByHigherReps).
+     */
+    private function isDominatedByHigherReps(\Illuminate\Database\Eloquent\Collection $logs, int $reps, float $weight, string $targetUnit, float $tolerance): bool
+    {
+        for ($higherReps = $reps + 1; $higherReps <= 10; $higherReps++) {
+            $bestAtHigher = $this->getBestWeightForReps($logs, $higherReps, $targetUnit);
+            if ($bestAtHigher['weight'] > 0 && $bestAtHigher['weight'] >= $weight - $tolerance) {
+                return true;
+            }
+        }
+        return false;
     }
     
     /**
