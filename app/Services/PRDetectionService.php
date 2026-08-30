@@ -194,6 +194,9 @@ class PRDetectionService
                     $query->where('rep_count', $pr['rep_count']);
                 } elseif ($pr['type'] === 'hypertrophy' && isset($pr['weight'])) {
                     $query->where('weight', $pr['weight']);
+                } elseif ($pr['type'] === 'speed' && isset($pr['weight'], $pr['rep_count'])) {
+                    $query->where('weight', $pr['weight'])
+                        ->where('rep_count', $pr['rep_count']);
                 }
                 
                 $previousPR = $query->first();

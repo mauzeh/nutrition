@@ -38,6 +38,10 @@ enum PRType: int
             self::TIME => '⏱️ Time PR!',
             self::ENDURANCE => '🔥 Endurance PR!',
             self::CONSISTENCY => '🎯 Consistency PR!',
+            self::LOAD => '🏋️ Load PR!',
+            self::DISTANCE => '🏃 Distance PR!',
+            self::DURATION => '⏱️ Duration PR!',
+            self::SPEED => '⚡ Speed PR!',
             self::NONE => '',
         };
     }
@@ -55,6 +59,10 @@ enum PRType: int
         // Priority order for display (most impressive first)
         $priority = [
             self::ONE_RM,
+            self::LOAD,
+            self::SPEED,
+            self::DISTANCE,
+            self::DURATION,
             self::REP_SPECIFIC,
             self::VOLUME,
             self::CONSISTENCY,
