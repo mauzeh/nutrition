@@ -50,7 +50,7 @@ class DetectAndRecordPRs
                 'pr_type' => $pr['type'],
                 'rep_count' => $pr['rep_count'] ?? null,
                 'weight' => $pr['weight'] ?? null,
-                'unit' => $liftLog->liftSets->first()->unit ?? 'lbs',
+                'unit' => $pr['unit'] ?? ($liftLog->liftSets->first()->unit ?? 'lbs'),
                 'value' => $pr['value'],
                 'previous_pr_id' => $pr['previous_pr_id'] ?? null,
                 'previous_value' => $pr['previous_value'] ?? null,

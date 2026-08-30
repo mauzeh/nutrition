@@ -250,7 +250,10 @@ class LoadOutputExerciseType extends BaseExerciseType
     public function getSupportedPRTypes(): array
     {
         return [
-            \App\Enums\PRType::VOLUME,
+            \App\Enums\PRType::LOAD,
+            \App\Enums\PRType::DISTANCE,
+            \App\Enums\PRType::DURATION,
+            \App\Enums\PRType::SPEED,
         ];
     }
 
@@ -266,6 +269,7 @@ class LoadOutputExerciseType extends BaseExerciseType
             $unit = $set->unit ?? 'lbs';
 
             $loadComp = $weight > 0 ? round($this->unitResolver()->convert($weight, $unit, 'lbs'), 4) : 0.0;
+            $loadStr = ($loadComp == (int) $loadComp) ? (string) (int) $loadComp : (string) $loadComp;
 
             $distance = self::normalizeDistanceToMeters(
                 (float) ($set->distance ?? 0),
@@ -284,7 +288,7 @@ class LoadOutputExerciseType extends BaseExerciseType
             }
 
             if ($loadComp > 0 && $distance > 0 && $duration > 0) {
-                $bucketKey = "{$loadComp}|{$distance}";
+                $bucketKey = "{$loadStr}|{$distance}";
                 if (!isset($speedBuckets[$bucketKey]) || $duration < $speedBuckets[$bucketKey]) {
                     $speedBuckets[$bucketKey] = $duration;
                 }
@@ -325,6 +329,7 @@ class LoadOutputExerciseType extends BaseExerciseType
                 $weight = (float) ($set->weight ?? 0);
                 $unit = $set->unit ?? 'lbs';
                 $loadComp = $weight > 0 ? round($this->unitResolver()->convert($weight, $unit, 'lbs'), 4) : 0.0;
+                $loadStr = ($loadComp == (int) $loadComp) ? (string) (int) $loadComp : (string) $loadComp;
 
                 $distance = self::normalizeDistanceToMeters(
                     (float) ($set->distance ?? 0),
@@ -348,7 +353,7 @@ class LoadOutputExerciseType extends BaseExerciseType
                 }
 
                 if ($loadComp > 0 && $distance > 0 && $duration > 0) {
-                    $bucketKey = "{$loadComp}|{$distance}";
+                    $bucketKey = "{$loadStr}|{$distance}";
                     if (!isset($prevSpeedBuckets[$bucketKey]) || $duration < $prevSpeedBuckets[$bucketKey]['duration']) {
                         $prevSpeedBuckets[$bucketKey] = [
                             'duration' => $duration,
@@ -366,6 +371,7 @@ class LoadOutputExerciseType extends BaseExerciseType
                     'value' => $currentMetrics['load'],
                     'previous_value' => null,
                     'previous_lift_log_id' => null,
+                    'unit' => 'lbs',
                 ];
             }
             if ($currentMetrics['distance'] > 0) {
@@ -374,6 +380,7 @@ class LoadOutputExerciseType extends BaseExerciseType
                     'value' => $currentMetrics['distance'],
                     'previous_value' => null,
                     'previous_lift_log_id' => null,
+                    'unit' => 'm',
                 ];
             }
             if ($currentMetrics['duration'] > 0) {
@@ -382,6 +389,7 @@ class LoadOutputExerciseType extends BaseExerciseType
                     'value' => $currentMetrics['duration'],
                     'previous_value' => null,
                     'previous_lift_log_id' => null,
+                    'unit' => 's',
                 ];
             }
 
@@ -394,6 +402,7 @@ class LoadOutputExerciseType extends BaseExerciseType
                 'value' => $currentMetrics['load'],
                 'previous_value' => $prevLoad > 0 ? $prevLoad : null,
                 'previous_lift_log_id' => $prevLoadLogId,
+                'unit' => 'lbs',
             ];
         }
 
@@ -403,6 +412,7 @@ class LoadOutputExerciseType extends BaseExerciseType
                 'value' => $currentMetrics['distance'],
                 'previous_value' => $prevDistance > 0 ? $prevDistance : null,
                 'previous_lift_log_id' => $prevDistanceLogId,
+                'unit' => 'm',
             ];
         }
 
@@ -412,6 +422,7 @@ class LoadOutputExerciseType extends BaseExerciseType
                 'value' => $currentMetrics['duration'],
                 'previous_value' => $prevDuration > 0 ? $prevDuration : null,
                 'previous_lift_log_id' => $prevDurationLogId,
+                'unit' => 's',
             ];
         }
 
@@ -419,11 +430,12 @@ class LoadOutputExerciseType extends BaseExerciseType
             if (isset($prevSpeedBuckets[$bucketKey])) {
                 $stored = $prevSpeedBuckets[$bucketKey]['duration'];
                 if ($this->beats($curDuration, $stored, 'min')) {
-                    [$loadComp, $integerMeters] = explode('|', $bucketKey);
+                    [$loadStr, $integerMeters] = explode('|', $bucketKey);
                     $prs[] = [
                         'type' => 'speed',
                         'value' => $curDuration,
-                        'weight' => (float) $loadComp,
+                        'weight' => (float) $loadStr,
+                        'unit' => 'lbs',
                         'rep_count' => (int) $integerMeters,
                         'previous_value' => $stored,
                         'previous_lift_log_id' => $prevSpeedBuckets[$bucketKey]['log_id'],
@@ -509,9 +521,17 @@ class LoadOutputExerciseType extends BaseExerciseType
             'duration' => isset($currentMetrics['duration']) && $currentMetrics['duration'] > 0
                 ? $this->formatDuration((int) $currentMetrics['duration'])
                 : null,
-            'speed' => isset($pr->weight, $pr->rep_count, $currentMetrics['speedBuckets']["{$pr->weight}|{$pr->rep_count}"])
-                ? $this->formatDuration((int) $currentMetrics['speedBuckets']["{$pr->weight}|{$pr->rep_count}"])
-                : null,
+            'speed' => (function() use ($pr, $currentMetrics) {
+                if (!isset($pr->weight, $pr->rep_count)) {
+                    return null;
+                }
+                $weight = (float) $pr->weight;
+                $loadStr = ($weight == (int) $weight) ? (string) (int) $weight : (string) $weight;
+                $key = "{$loadStr}|{$pr->rep_count}";
+                return isset($currentMetrics['speedBuckets'][$key])
+                    ? $this->formatDuration((int) $currentMetrics['speedBuckets'][$key])
+                    : null;
+            })(),
             default => null,
         };
     }

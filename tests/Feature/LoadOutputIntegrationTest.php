@@ -67,28 +67,20 @@ class LoadOutputIntegrationTest extends TestCase
             'time' => 30,
         ]);
 
-        $detectService = app(\App\Services\PRDetectionService::class);
-        $prs = $detectService->detectPRsWithDetails($log);
-
-        $this->assertNotEmpty($prs);
-
-        // Record PRs
-        foreach ($prs as $prData) {
-            PersonalRecord::create(array_merge($prData, [
-                'user_id' => $user->id,
-                'exercise_id' => $exercise->id,
-                'lift_log_id' => $log->id,
-                'achieved_at' => now(),
-            ]));
-        }
-
-        $log->update([
-            'is_pr' => true,
-            'pr_count' => count($prs),
-        ]);
+        // Drive through REAL detection path via event listener
+        $listener = app(\App\Listeners\DetectAndRecordPRs::class);
+        $listener->handle(new \App\Events\LiftLogCompleted($log));
 
         $log->refresh();
         $this->assertTrue((bool) $log->is_pr);
         $this->assertGreaterThan(0, $log->pr_count);
+
+        // Verify isLiftLogPR returns a non-zero bitmask flag
+        $detectService = app(\App\Services\PRDetectionService::class);
+        $prFlags = $detectService->isLiftLogPR($log, $exercise, $user);
+        $this->assertGreaterThan(0, $prFlags);
+        $this->assertTrue(\App\Enums\PRType::LOAD->isIn($prFlags));
+        $this->assertTrue(\App\Enums\PRType::DISTANCE->isIn($prFlags));
+        $this->assertTrue(\App\Enums\PRType::DURATION->isIn($prFlags));
     }
 }

@@ -12,6 +12,10 @@ enum PRType: int
     case TIME = 16;
     case ENDURANCE = 32;
     case CONSISTENCY = 64;
+    case LOAD = 128;
+    case DISTANCE = 256;
+    case DURATION = 512;
+    case SPEED = 1024;
 
     /**
      * Check if a flags value contains this PR type

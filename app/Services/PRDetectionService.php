@@ -225,6 +225,10 @@ class PRDetectionService
             'density' => PRType::DENSITY,
             'endurance' => PRType::ENDURANCE,
             'consistency' => PRType::CONSISTENCY,
+            'load' => PRType::LOAD,
+            'distance' => PRType::DISTANCE,
+            'duration' => PRType::DURATION,
+            'speed' => PRType::SPEED,
             default => null,
         };
     }
