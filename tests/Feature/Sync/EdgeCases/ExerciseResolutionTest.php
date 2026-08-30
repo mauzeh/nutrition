@@ -84,11 +84,12 @@ class ExerciseResolutionTest extends TestCase
             'log_type' => 'barbell',
         ]);
 
-        $this->user->liftLogs()->create([
+        $liftLog = $this->user->liftLogs()->create([
             'exercise_id' => $exercise->id,
             'logged_at' => now(),
             'log_type' => 'barbell',
         ]);
+        $liftLog->liftSets()->create(['weight' => 225, 'reps' => 5, 'unit' => 'lbs']);
 
         $response = $this->withHeaders($this->headers)
             ->getJson('/api/sync/changes');
@@ -118,11 +119,12 @@ class ExerciseResolutionTest extends TestCase
             'log_type' => 'barbell',
         ]);
 
-        $this->user->liftLogs()->create([
+        $liftLog = $this->user->liftLogs()->create([
             'exercise_id' => $exercise->id,
             'logged_at' => now(),
             'log_type' => 'barbell',
         ]);
+        $liftLog->liftSets()->create(['weight' => 135, 'reps' => 5, 'unit' => 'lbs']);
 
         $response = $this->withHeaders($this->headers)
             ->getJson('/api/sync/restore');
@@ -150,11 +152,12 @@ class ExerciseResolutionTest extends TestCase
             'log_type' => 'barbell',
         ]);
 
-        $this->user->liftLogs()->create([
+        $liftLog = $this->user->liftLogs()->create([
             'exercise_id' => $exercise->id,
             'logged_at' => now(),
             'log_type' => 'barbell',
         ]);
+        $liftLog->liftSets()->create(['weight' => 100, 'reps' => 5, 'unit' => 'lbs']);
 
         // Update the title
         $exercise->update(['title' => 'New Better Title']);

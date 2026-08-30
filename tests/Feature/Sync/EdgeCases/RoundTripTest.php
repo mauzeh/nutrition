@@ -74,7 +74,7 @@ class RoundTripTest extends TestCase
             'log_type' => 'barbell',
         ]);
 
-        LiftLog::create([
+        $liftLog = LiftLog::create([
             'user_id' => $this->user->id,
             'exercise_id' => $exercise->id,
             'logged_at' => now(),
@@ -83,6 +83,7 @@ class RoundTripTest extends TestCase
             'block_index' => null,
             'movement_index' => null,
         ]);
+        $liftLog->liftSets()->create(['weight' => 135, 'reps' => 5, 'unit' => 'lbs']);
 
         $response = $this->withHeaders($this->headers)->getJson('/api/sync/changes');
         $response->assertStatus(200);
@@ -266,5 +267,76 @@ class RoundTripTest extends TestCase
         $this->assertEquals('static-hold', $log['logType']);
         $this->assertArrayHasKey('duration', $log['sets'][0]);
         $this->assertEquals(60, $log['sets'][0]['duration']);
+    }
+
+    /**
+     * A log whose sets are all soft-deleted carries no unit and is omitted
+     * from the restore payload entirely (no fabricated weightUnit fallback).
+     */
+    public function test_log_with_no_live_sets_is_skipped_in_restore(): void
+    {
+        $this->withHeaders($this->headers)->postJson('/api/sync/logs', [
+            'exercise_name' => 'Front Squat',
+            'canonical_name' => 'front_squat',
+            'date' => '2026-06-17',
+            'log_type' => 'barbell',
+            'weight_unit' => 'kg',
+            'sets' => [['weight' => 100, 'reps' => 5]],
+        ])->assertStatus(200);
+
+        $liftLog = LiftLog::where('user_id', $this->user->id)->firstOrFail();
+        $liftLog->liftSets()->delete();
+
+        $response = $this->withHeaders($this->headers)->getJson('/api/sync/restore');
+        $response->assertStatus(200);
+
+        $logs = collect($response->json('logs'));
+        $this->assertNull($logs->firstWhere('exerciseId', 'front_squat'));
+    }
+
+    /**
+     * A log whose sets are all soft-deleted is omitted from the changes payload.
+     */
+    public function test_log_with_no_live_sets_is_skipped_in_changes(): void
+    {
+        $this->withHeaders($this->headers)->postJson('/api/sync/logs', [
+            'exercise_name' => 'Back Squat',
+            'canonical_name' => 'back_squat',
+            'date' => '2026-06-17',
+            'log_type' => 'barbell',
+            'weight_unit' => 'kg',
+            'sets' => [['weight' => 120, 'reps' => 3]],
+        ])->assertStatus(200);
+
+        $liftLog = LiftLog::where('user_id', $this->user->id)->firstOrFail();
+        $liftLog->liftSets()->delete();
+
+        $response = $this->withHeaders($this->headers)->getJson('/api/sync/changes');
+        $response->assertStatus(200);
+
+        $logs = collect($response->json('logs'));
+        $this->assertNull($logs->firstWhere('exerciseId', 'back_squat'));
+    }
+
+    /**
+     * A normal log with live sets still reports the stored per-log weightUnit
+     * (no fallback), confirming the skip guard didn't drop valid logs.
+     */
+    public function test_log_with_live_sets_reports_stored_weight_unit(): void
+    {
+        $this->withHeaders($this->headers)->postJson('/api/sync/logs', [
+            'exercise_name' => 'Deadlift',
+            'canonical_name' => 'deadlift',
+            'date' => '2026-06-17',
+            'log_type' => 'barbell',
+            'weight_unit' => 'kg',
+            'sets' => [['weight' => 140, 'reps' => 5]],
+        ])->assertStatus(200);
+
+        $response = $this->withHeaders($this->headers)->getJson('/api/sync/restore');
+        $log = collect($response->json('logs'))->firstWhere('exerciseId', 'deadlift');
+
+        $this->assertNotNull($log);
+        $this->assertSame('kg', $log['weightUnit']);
     }
 }

@@ -59,13 +59,18 @@ class RestoreController
                 };
             }
 
+            // Skip logs with no live sets: they carry no unit and would otherwise
+            // require a fabricated fallback in the payload.
+            $firstSet = $liftLog->liftSets->first();
+            if (! $firstSet) {
+                continue;
+            }
+
             // Map sets
             $sets = [];
             foreach ($liftLog->liftSets as $set) {
                 $sets[] = $this->setFieldMapper->mapFromColumns($logType, $set);
             }
-
-            $firstSet = $liftLog->liftSets->first();
 
             $logData = [
                 'id' => $liftLog->id,
@@ -75,7 +80,7 @@ class RestoreController
                 'logType' => $logType,
                 'sets' => $sets,
                 'note' => $liftLog->comments,
-                'weightUnit' => $firstSet?->unit ?? 'lbs',
+                'weightUnit' => $firstSet->unit,
             ];
 
             if ($liftLog->track !== null) {

@@ -52,12 +52,17 @@ class ChangesController
                 };
             }
 
+            // Skip logs with no live sets: they carry no unit and would otherwise
+            // require a fabricated fallback in the payload.
+            $firstSet = $liftLog->liftSets->first();
+            if (! $firstSet) {
+                continue;
+            }
+
             $sets = [];
             foreach ($liftLog->liftSets as $set) {
                 $sets[] = $this->setFieldMapper->mapFromColumns($logType, $set);
             }
-
-            $firstSet = $liftLog->liftSets->first();
 
             $logData = [
                 'id' => $liftLog->id,
@@ -67,7 +72,7 @@ class ChangesController
                 'logType' => $logType,
                 'sets' => $sets,
                 'note' => $liftLog->comments,
-                'weightUnit' => $firstSet?->unit ?? 'lbs',
+                'weightUnit' => $firstSet->unit,
                 'updated_at' => $liftLog->updated_at->toIso8601String(),
             ];
 
