@@ -111,7 +111,7 @@ flowchart TD
     E["Mobile-entry display<br/>PRRecordsComponentAssembler (met + not-met tables)<br/>calls strategy->comparisonValue() for by-how-much<br/>LiftLogTableRowBuilder: row-pr + badge off is_pr<br/>LiftLogFormFactory: form from config form_fields"]
     A -->|logType, sets| B
     B -->|exercise_type| C
-    C -->|prs[] {type,value,previous_value}| D
+    C -->|prs type value previous_value| D
     D -->|is_pr / pr_count + PR rows| E
 ```
 
