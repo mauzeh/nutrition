@@ -103,10 +103,15 @@ Checkpoints use `php artisan test --parallel`.
   and append the four; both sqlite `enum()` + mysql `MODIFY`. down() deletes rows with the four new values
   then reverts the enum.
 - `LoadOutputExerciseType extends BaseExerciseType` (`getTypeName()` → `'load_output'`):
-  - `calculateCurrentMetrics()`: `load` = heaviest single-set weight **normalized via `UnitResolver`** (NOT
-    raw int — closes D1); `distance` = farthest single-set integer meters (centralized ft→m helper — D4);
-    `duration` = longest single-set integer seconds; plus per-set tuples for `speed` (each set's
-    (load, integerDistance, duration) where all three present).
+  - `calculateCurrentMetrics()` returns a fixed, explicit shape (do NOT invent per-record loops elsewhere):
+    `['load' => int, 'distance' => int, 'duration' => int, 'speedBuckets' => ['{loadComp}|{m}' => minSeconds]]`.
+    `load` = heaviest single-set weight **normalized via `UnitResolver`** (NOT raw int — D1); `distance` =
+    farthest single-set integer meters (centralized ft→m helper — D4); `duration` = longest single-set
+    integer seconds; `speedBuckets` = for each set that carries load + distance + duration, the MIN seconds
+    per `{loadComp}|{integerMeters}` key.
+  - `compareToPrevious()` builds the SAME-shaped map from `$previousLogs` ONCE (one reduction, not four
+    separate best-loops like Sled), then compares field-by-field and bucket-by-bucket via the one `beats()`
+    helper. Do not write a dedicated per-record loop over previous logs per record — that regrows the file.
   - `compareToPrevious()`: route EVERY record through one private `beats($current, $stored, $direction)`
     helper (max = `$current > $stored`; min = `$current < $stored`) — do not re-inline the comparison per
     record. `load`/`distance`/`duration` use `direction='max'`; `speed` uses `direction='min'`.
@@ -117,7 +122,10 @@ Checkpoints use `php artisan test --parallel`.
     `duration` fire on first-ever log if non-zero (match Athlete + the fixture).
   - `formatPRDisplay()`/`formatCurrentPRDisplay()`: the four labels above; `speed` shows the load+distance
     context ("Fastest 60 kg × 200 m" style) and duration value.
-  - `getSupportedPRTypes()`: non-empty (gate only).
+  - `getSupportedPRTypes()`: non-empty (gate only). NOTE: the `PRType` int-bitmask enum
+    (`app/Enums/PRType.php`) is intentionally DECOUPLED from the string `pr_type` values — do NOT add
+    `load`/`distance`/`duration`/`speed` cases to `PRType`; the string values live only in the DB enum +
+    strategy strings (same as sled did).
   - Centralized ft→m constant/helper (D4) — no inlined `0.3048`.
 - Register `load_output` in `config/exercise_types.php` (mirror `sled`): validation must permit weight +
   distance + distance_unit + time together (all nullable-ish; a set may carry any combination), duration
@@ -138,9 +146,12 @@ Checkpoints use `php artisan test --parallel`.
 - Migration B (data). Order strictly: (1) UPDATE `exercises` where `log_type IN ('sled','weighted-carry')`
   set `exercise_type='load_output'`; update dependent `lift_logs.log_type` if the precedent does. (2) For
   each affected (user_id, exercise_id), call `PRRecalculationService::recalculateAllPRsForExercise` so old
-  `sled_*` rows are regenerated under the new strings. (3) Only after (2) leaves ZERO rows referencing
-  `sled_*`, drop `sled_weight`/`sled_distance`/`sled_volume` from the enum (same sqlite/mysql dance).
-  Scope strictly by `log_type` — genuine static-holds + dual-kettlebells untouched.
+  `sled_*` rows are regenerated under the new strings (this resolves the strategy from the NOW-re-typed
+  `exercise_type`, so step 1 MUST precede step 2). (3) **Assert zero remaining refs before dropping** —
+  `SELECT COUNT(*) FROM personal_records WHERE pr_type IN ('sled_weight','sled_distance','sled_volume')`
+  must be 0; if non-zero, ABORT the drop (do not force). Only then drop the three `sled_*` values from the
+  enum (same sqlite/mysql dance). Scope strictly by `log_type` — genuine static-holds + dual-kettlebells
+  untouched.
 - down(): restore `exercise_type` (carry→static_hold, sled→sled), reverse lift_logs.log_type, re-add
   `sled_*` enum values; document that recomputed PR rows aren't perfectly reversible.
 - **Checkpoint:** `php artisan test --parallel`.

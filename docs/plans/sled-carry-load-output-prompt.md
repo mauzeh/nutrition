@@ -80,10 +80,12 @@ Follow the phases in `docs/plans/sled-carry-load-output.md` in order. Each numbe
    keep `'dual-kettlebell','static-hold' => 'static_hold'`. Feature test: sync a carry + a sled, assert the
    correct pr_type rows written.
 4. **Checkpoint** — `php artisan test --parallel`.
-5. **Re-typing migration + recompute + drop sled_*** — Migration B, strict order: update exercises (+ dependent
-   lift_logs) scoped by `log_type IN ('sled','weighted-carry')` → recompute affected via
-   `PRRecalculationService::recalculateAllPRsForExercise` → drop `sled_*` from the enum only after zero rows
-   reference it. Correct down() path.
+5. **Re-typing migration + recompute + drop sled_*** — Migration B, strict order: (1) update exercises
+   (+ dependent lift_logs) scoped by `log_type IN ('sled','weighted-carry')`; (2) recompute affected via
+   `PRRecalculationService::recalculateAllPRsForExercise` (step 1 MUST precede — recompute resolves the
+   strategy from the re-typed exercise_type); (3) ASSERT `SELECT COUNT(*) FROM personal_records WHERE
+   pr_type IN ('sled_weight','sled_distance','sled_volume')` = 0 and ABORT the drop if non-zero; only then
+   drop `sled_*` from the enum. Correct down() path.
 6. **Checkpoint** — `php artisan test --parallel`.
 7. **Delete SledExerciseType + sled config key + dead sled_* code.** Grep `sled` to confirm cleanup.
 8. **Final checkpoint** — `php artisan test --parallel`.
