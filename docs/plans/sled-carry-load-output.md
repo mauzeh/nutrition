@@ -119,10 +119,10 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    M1["1. Add enum values<br/>personal_records.pr_type<br/>+= load/distance/duration/speed<br/>(keep sled_* for now)"]
-    M2["2. Re-type rows<br/>UPDATE exercises WHERE<br/>log_type IN (sled, weighted-carry)<br/>→ exercise_type='load_output'"]
-    M3["3. Recompute PRs<br/>PRRecalculationService<br/>::recalculateAllPRsForExercise<br/>(regenerates rows under new strings)"]
-    M4["4. Assert + drop<br/>COUNT(sled_*) must = 0<br/>then drop sled_* from enum<br/>(abort if non-zero)"]
+    M1["Step 1 — Add enum values<br/>personal_records.pr_type<br/>plus load/distance/duration/speed<br/>(keep sled_* for now)"]
+    M2["Step 2 — Re-type rows<br/>UPDATE exercises WHERE<br/>log_type IN (sled, weighted-carry)<br/>to exercise_type load_output"]
+    M3["Step 3 — Recompute PRs<br/>PRRecalculationService<br/>recalculateAllPRsForExercise<br/>(regenerates rows under new strings)"]
+    M4["Step 4 — Assert then drop<br/>COUNT(sled_*) must equal 0<br/>then drop sled_* from enum<br/>(abort if non-zero)"]
     M1 --> M2 --> M3 --> M4
 ```
 
