@@ -152,6 +152,8 @@ class PRRecordsComponentAssembler
             } elseif ($pr->pr_type === 'consistency') {
                 // Consistency PRs are set-count-specific
                 $beatenPRMap['consistency_' . $pr->rep_count] = true;
+            } elseif ($pr->pr_type === 'speed') {
+                $beatenPRMap['speed_' . $pr->weight . '_' . $pr->rep_count] = true;
             } elseif ($pr->pr_type === 'time') {
                 $beatenPRMap['time'] = true;
             } elseif ($pr->pr_type === 'endurance') {
@@ -178,6 +180,8 @@ class PRRecordsComponentAssembler
                 $key = 'density_' . $pr->weight . '_' . $pr->rep_count;
             } elseif ($pr->pr_type === 'consistency') {
                 $key = 'consistency_' . $pr->rep_count;
+            } elseif ($pr->pr_type === 'speed') {
+                $key = 'speed_' . $pr->weight . '_' . $pr->rep_count;
             }
             
             if (isset($beatenPRMap[$key])) {
@@ -207,6 +211,13 @@ class PRRecordsComponentAssembler
         LiftLog $liftLog,
         $strategy
     ): ?string {
+        if (method_exists($strategy, 'comparisonValue')) {
+            $value = $strategy->comparisonValue($pr, $currentMetrics, $liftLog);
+            if ($value !== null) {
+                return $value;
+            }
+        }
+
         $isBodyweight = $liftLog->exercise->exercise_type === 'bodyweight';
         $isStaticHold = $liftLog->exercise->exercise_type === 'static_hold';
         $isCardio = $liftLog->exercise->exercise_type === 'cardio';

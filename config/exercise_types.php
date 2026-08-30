@@ -229,41 +229,49 @@ return [
          * with distance. Weight represents plates loaded on the sled, distance
          * represents how far it was pushed/pulled.
          */
-        'sled' => [
-            'class' => \App\Services\ExerciseTypes\SledExerciseType::class,
+        'load_output' => [
+            'class' => \App\Services\ExerciseTypes\LoadOutputExerciseType::class,
             'validation' => [
-                'weight' => 'required|numeric|min:0|max:2000',
-                'distance' => 'required|numeric|min:0|max:999',
-                'distance_unit' => 'required|string|in:m,ft',
+                'weight' => 'nullable|numeric|min:0|max:2000',
+                'distance' => 'nullable|numeric|min:0|max:999',
+                'distance_unit' => 'nullable|string|in:m,ft',
+                'time' => 'nullable|integer|min:1|max:900',
             ],
-            'chart_type' => 'sled_progression',
+            'chart_type' => 'load_output_progression',
             'supports_1rm' => false,
-            'form_fields' => ['weight', 'distance', 'distance_unit'],
-            'progression_types' => ['weight_progression', 'distance_progression'],
-            'display_format' => 'weight_distance',
+            'form_fields' => ['weight', 'distance', 'distance_unit', 'time'],
+            'progression_types' => ['weight_progression', 'distance_progression', 'duration_progression'],
+            'display_format' => 'load_output',
             'field_labels' => [
                 'weight' => 'Weight (lbs):',
                 'distance' => 'Distance:',
                 'distance_unit' => 'Unit:',
+                'time' => 'Time (seconds):',
             ],
             'field_increments' => [
-                'weight' => 45,
+                'weight' => 5,
                 'distance' => 5,
+                'time' => 1,
             ],
             'field_defaults' => [
                 'weight' => 90,
                 'distance' => 50,
                 'distance_unit' => 'm',
+                'time' => 30,
             ],
             'field_mins' => [
                 'weight' => 0,
                 'distance' => 0,
+                'time' => 1,
             ],
             'field_maxes' => [
                 'weight' => 2000,
                 'distance' => 999,
+                'time' => 900,
             ],
         ],
+
+
 
         /**
          * Static Hold Exercise Type
