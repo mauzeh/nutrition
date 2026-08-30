@@ -50,9 +50,81 @@ compute identical PRs to the Athlete engine (they round-trip through sync).
 - Duration cap **900s** for `load_output` (FROZEN §7); `static_hold`'s 300s unchanged.
 - `personal_records.pr_type` enum gains `load`/`distance`/`duration`/`speed`; historical sled + carry
   re-typed (scoped by `log_type`); affected PRs recomputed; then `sled_*` enum values dropped.
+- **Logging form** offers weight + distance + distance_unit + time for `load_output` (config-driven via
+  `form_fields` → `getFormFieldDefinitions`; today sled's form is weight+distance only and carry rides
+  static_hold's time+weight — so this is a real form change, done via config).
+- **Mobile-entry per-log PR table** (`PRRecordsComponentAssembler`) renders the four records in both the
+  "met" (beaten) and "current / not-yet-beaten + by-how-much" tables — including `speed`'s composite-key
+  de-dupe. **The by-how-much comparison logic MUST live in the strategy** (see the stipulation below), not
+  in the assembler's `getComparisonValue` switch.
 
 > **Zero behavioral change** to `static_hold` (genuine holds + dual-kettlebell), and to every non-sled/
 > non-carry type. Only sled + weighted-carry change.
+
+### Two consumers the strategy must serve (do not miss these)
+
+1. **Logging form — config-driven, but it IS a change.** `LiftLogFormFactory` calls
+   `strategy->getFormFieldDefinitions()` / config `form_fields`. Set `load_output`'s `form_fields` to
+   `['weight','distance','distance_unit','time']` (+ field labels/increments/defaults mirroring sled for
+   weight/distance and static_hold for time; distance step 5, weight step per unit). No form-layer code
+   branch is added — the form renders from config.
+
+2. **Mobile-entry PR met/not-met table — `app/Services/LiftLogTableRowBuilder/PRRecordsComponentAssembler.php`.**
+   Per log it builds a **beaten/met** table (via `strategy->formatPRDisplay`) and a **current/not-yet-beaten**
+   table with a **by-how-much comparison** (via `strategy->formatCurrentPRDisplay` + a `getComparisonValue()`
+   `switch ($pr->pr_type)`). Today this switch has arms for `one_rm`/`volume`/`rep_specific`/`time`/
+   `endurance`/… and **NO sled arms at all** — so sled's "current record + by-how-much" currently returns
+   `null` (a pre-existing gap). It also has a per-type **beaten-PR-map** (`rep_specific_{reps}`,
+   `hypertrophy_{weight}`, `density_{weight}_{reps}`, `consistency_{reps}`, else `{type}`) that de-dupes
+   met-vs-current; `speed` is keyed by its composite bucket and needs a matching key here.
+
+   **STIPULATED (not optional): move the per-type comparison OUT of `getComparisonValue`'s switch and INTO
+   the strategy.** Each exercise type owns how it compares current metrics to a stored PR (e.g. a strategy
+   method `comparisonValue(PersonalRecord $pr, array $currentMetrics, LiftLog $log): ?string`).
+   `getComparisonValue` becomes a thin delegator (`return $strategy->comparisonValue(...)`), shrinking or
+   eliminating its switch. This is a simplification of an existing branch-heavy function AND it fixes the
+   missing sled/`load_output` comparison in one move — the decoupling your architecture wants. For the
+   beaten-PR-map de-dupe, add `speed`'s composite-key case (`speed_{loadComp}_{integerMeters}`) alongside
+   the existing keyed cases.
+
+### PR-row styling is string-agnostic — verify, don't special-case
+
+The mobile-entry lift row styling ("this log hit a PR") is driven by the generic `lift_logs.is_pr` /
+`pr_count` flags, NOT the PR-type strings: `PRRecalculationService` + `DetectAndRecordPRs` set
+`is_pr = count($prs) > 0`; `LiftLogTableRowBuilder` sets `cssClass => is_pr ? 'row-pr' : null` and calls
+`addPRBadge()` on `is_pr`; `PRRecordsComponentAssembler` gates the beaten table on `is_pr`. So the row
+styling + PR badge keep working automatically once `LoadOutputExerciseType` emits any PR. **Verification
+step (not new code):** a feature test asserts a `load_output` log that sets a PR has `is_pr = true`,
+`pr_count > 0`, and therefore the `row-pr` class + badge — proving the styling path is unaffected by the
+new strings.
+
+---
+
+## Diagram L1 — Runtime PR pipeline (what each layer passes)
+
+```mermaid
+flowchart TD
+    A["Sync ingress<br/>StoreSyncLogAction + SetFieldMapper<br/>stores weight/distance/distance_unit/time + unit stamp<br/>dispatches LiftLogCompleted (verbatim, no conversion)"]
+    B["Resolver<br/>ExerciseResolverService.deriveExerciseType(logType)<br/>weighted-carry / sled → 'load_output'<br/>sets exercises.exercise_type"]
+    C["Factory + Strategy<br/>ExerciseTypeFactory → LoadOutputExerciseType<br/>calculateCurrentMetrics → load, distance, duration, speedBuckets<br/>compareToPrevious via beats(cur, stored, dir)<br/>comparisonValue() for the PR table"]
+    D["PR persistence<br/>DetectAndRecordPRs → PersonalRecord::create<br/>pr_type ∈ enum {load,distance,duration,speed}<br/>sets lift_logs.is_pr / pr_count"]
+    E["Mobile-entry display<br/>PRRecordsComponentAssembler (met + not-met tables)<br/>calls strategy->comparisonValue() for by-how-much<br/>LiftLogTableRowBuilder: row-pr + badge off is_pr<br/>LiftLogFormFactory: form from config form_fields"]
+    A -->|logType, sets| B
+    B -->|exercise_type| C
+    C -->|prs[] {type,value,previous_value}| D
+    D -->|is_pr / pr_count + PR rows| E
+```
+
+## Diagram L2 — Migration sequence (strict order; one-time)
+
+```mermaid
+flowchart LR
+    M1["1. Add enum values<br/>personal_records.pr_type<br/>+= load/distance/duration/speed<br/>(keep sled_* for now)"]
+    M2["2. Re-type rows<br/>UPDATE exercises WHERE<br/>log_type IN (sled, weighted-carry)<br/>→ exercise_type='load_output'"]
+    M3["3. Recompute PRs<br/>PRRecalculationService<br/>::recalculateAllPRsForExercise<br/>(regenerates rows under new strings)"]
+    M4["4. Assert + drop<br/>COUNT(sled_*) must = 0<br/>then drop sled_* from enum<br/>(abort if non-zero)"]
+    M1 --> M2 --> M3 --> M4
+```
 
 ---
 
@@ -70,6 +142,9 @@ app/Listeners/DetectAndRecordPRs.php                       → writes PersonalRe
 app/Services/PRDetectionService.php                        → detectPRsWithDetails(): gates on getSupportedPRTypes() non-empty (~155); calls calculateCurrentMetrics + compareToPrevious; enriches previous_pr_id by matching pr_type string.
 app/Services/PRRecalculationService.php                    → recalculateAllPRsForExercise(userId, exerciseId) — THE centralized recompute used by the re-typing migration.
 app/Enums/PRType.php                                       → int bitmask; decoupled from string pr_type values. No new case needed. getSupportedPRTypes() is only a non-empty gate.
+app/Services/Factories/LiftLogFormFactory.php              → builds the logging form from strategy->getFormFieldDefinitions()/config form_fields. NO branch to add — load_output's form_fields config drives it.
+app/Services/LiftLogTableRowBuilder/PRRecordsComponentAssembler.php → the mobile-entry PR met/not-met table. Has getComparisonValue() switch(pr_type) (~215) + beaten-PR-map de-dupe (~144); STIPULATED to delegate comparison into the strategy. NO sled arms today (pre-existing gap load_output fixes).
+app/Services/LiftLogTableRowBuilder.php                    → sets cssClass 'row-pr' + addPRBadge() off $liftLog->is_pr (string-agnostic — verify, don't special-case).
 ```
 
 Migration precedents (read before writing):
@@ -122,6 +197,11 @@ Checkpoints use `php artisan test --parallel`.
     `duration` fire on first-ever log if non-zero (match Athlete + the fixture).
   - `formatPRDisplay()`/`formatCurrentPRDisplay()`: the four labels above; `speed` shows the load+distance
     context ("Fastest 60 kg × 200 m" style) and duration value.
+  - **`comparisonValue(PersonalRecord $pr, array $currentMetrics, LiftLog $log): ?string`** (STIPULATED
+    new strategy method — the mobile-entry PR table's "by-how-much" for each record; see Phase 2). Reads the
+    `load_output` metric keys (`load`/`distance`/`duration`/`speedBuckets`) and returns the formatted
+    current value for the PR's type, or null. This is where the per-type comparison logic lives now — NOT
+    in the assembler's switch.
   - `getSupportedPRTypes()`: non-empty (gate only). NOTE: the `PRType` int-bitmask enum
     (`app/Enums/PRType.php`) is intentionally DECOUPLED from the string `pr_type` values — do NOT add
     `load`/`distance`/`duration`/`speed` cases to `PRType`; the string values live only in the DB enum +
@@ -134,10 +214,23 @@ Checkpoints use `php artisan test --parallel`.
   a `speed` PR (same load+distance, shorter duration) + non-PR (equal/longer) + different-bucket (no PR).
 - **Checkpoint:** `php artisan test --parallel`.
 
-### Phase 2 — Resolver switch + single integration point + feature test
+### Phase 2 — Resolver switch + display/form/table consumers + feature tests
 - `ExerciseResolverService::deriveExerciseType()`: new arm `'weighted-carry','sled' => 'load_output'`;
   remove `'weighted-carry'` from the static_hold arm and remove the `'sled' => 'sled'` arm; keep
   `'dual-kettlebell','static-hold' => 'static_hold'`.
+- **Logging form:** confirmed config-driven — `load_output`'s `form_fields`
+  `['weight','distance','distance_unit','time']` (Phase 1) makes `LiftLogFormFactory` render the 4-field
+  form. No form-layer branch. A test asserts the form definition for a `load_output` exercise contains all
+  four fields with correct labels/increments.
+- **Mobile-entry PR table (`PRRecordsComponentAssembler`):** (a) push the per-type comparison OUT of
+  `getComparisonValue`'s `switch` INTO `strategy->comparisonValue(...)` — the assembler calls the strategy
+  method; the switch shrinks toward a thin delegator (STIPULATED — a simplification, and it fixes the
+  pre-existing missing-sled-comparison gap). (b) Add `speed`'s composite-key case to the beaten-PR-map
+  de-dupe (`speed_{loadComp}_{integerMeters}`). Tests: a `load_output` log renders correct met + not-met
+  rows with by-how-much for load/distance/duration/speed.
+- **PR-row styling (verify, no new code):** feature test — a `load_output` log that sets a PR has
+  `is_pr = true` / `pr_count > 0`, so `LiftLogTableRowBuilder` emits `cssClass 'row-pr'` + the PR badge.
+  Confirms the string-agnostic styling path is unaffected.
 - Feature test: sync-log a carry (weight+distance+duration) and a sled; assert `load`/`distance`/`duration`
   (+ `speed` where applicable) PR rows are written with the correct pr_type values.
 - **Checkpoint:** `php artisan test --parallel`.
@@ -172,9 +265,13 @@ Checkpoints use `php artisan test --parallel`.
 | Re-typed `exercises` (+ dependent `lift_logs`) | Web UI exercise pages, charts, mobile summary, progression for those exercises; their existing `personal_records` | Recompute PRs; verify web UI renders a re-typed carry/sled via the new strategy |
 | Carry now carries load + optional distance + duration | `StaticHoldExerciseType` no longer handles carries; the new strategy does | Confirm static_hold owns only genuine holds + dual-kettlebell |
 | `weighted-carry`/`sled` sync ingress | `SetFieldMapper::mapToColumns` (stores weight/distance/distance_unit/time) — UNCHANGED (ingress stays verbatim) | New strategy reads those columns; no ingress change |
+| **Logging form** for load_output | `LiftLogFormFactory` → `strategy->getFormFieldDefinitions()`/config `form_fields` | Config-driven; set `form_fields` to weight/distance/distance_unit/time; test the form definition |
+| **Mobile-entry PR table** | `PRRecordsComponentAssembler`: `getComparisonValue` switch(pr_type) + beaten-PR-map de-dupe | Push comparison INTO `strategy->comparisonValue()` (switch shrinks); add `speed` composite-key to the de-dupe map |
+| **PR-row styling / badge** | `LiftLogTableRowBuilder` (`row-pr` + `addPRBadge` off `is_pr`); `PRRecalculationService`/`DetectAndRecordPRs` set `is_pr`/`pr_count` | String-agnostic — no code change; feature-test the flag flips for a load_output PR |
 
-Tests asserting old shape: `static_hold` tests using a carry fixture; sled PR tests asserting `sled_*`.
-List and update/remove them in the prompt.
+Tests asserting old shape: `static_hold` tests using a carry fixture; sled PR tests asserting `sled_*`;
+any `PRRecordsComponentAssembler`/`getComparisonValue` test asserting the old switch. List and
+update/remove them in the prompt.
 
 ---
 
@@ -192,6 +289,10 @@ Goal: fewer conditional branches, better layer decoupling, less production code.
   no longer conceptually carries a movement it shouldn't. Net fewer special cases.
 - **No new `switch`/`match` on the exercise-type string** outside the config `types` map. Dispatch stays
   config-driven (a new key), not an `if`.
+- **`getComparisonValue`'s `pr_type` switch shrinks, not grows.** Comparison logic moves into
+  `strategy->comparisonValue()`; the assembler delegates. Net: one fewer branch-heavy switch, and the
+  pre-existing missing-sled comparison is fixed as a side effect. Do NOT add `load`/`distance`/`duration`/
+  `speed` arms to the assembler's switch — that would grow the exact function we're shrinking.
 - **Net production LOC ≤ 0** for the change (excluding tests/migrations): deleting `SledExerciseType` + its
   config key + `sled_*` display arms should offset the new strategy. Report before/after in the retro.
 - **Layer decoupling:** the strategy computes metrics + PRs; label copy lives in the `formatPRDisplay`/

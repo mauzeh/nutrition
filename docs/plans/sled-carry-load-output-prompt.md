@@ -31,6 +31,9 @@ app/Services/UnitResolver.php                            → convert()/format() 
 app/Listeners/DetectAndRecordPRs.php                     → writes PersonalRecord rows (pr_type must be valid enum)
 app/Services/PRDetectionService.php                      → gates on getSupportedPRTypes(); calls metrics + compare
 app/Services/PRRecalculationService.php                  → recalculateAllPRsForExercise() — the recompute used by Migration B
+app/Services/Factories/LiftLogFormFactory.php            → logging form from config form_fields (no branch to add)
+app/Services/LiftLogTableRowBuilder/PRRecordsComponentAssembler.php → PR met/not-met table; getComparisonValue switch (STIPULATED: delegate to strategy->comparisonValue) + beaten-PR-map (add speed composite key)
+app/Services/LiftLogTableRowBuilder.php                  → row-pr class + addPRBadge off is_pr (string-agnostic — verify only)
 ```
 
 ### 4. Reference (already implemented — study, don't rebuild)
@@ -76,9 +79,15 @@ Follow the phases in `docs/plans/sled-carry-load-output.md` in order. Each numbe
    normalization, speed PR / non-PR (equal or longer) / different-bucket. Keep `LoadOutputExerciseType`
    LOC ≤ the deleted SledExerciseType.
 2. **Checkpoint** — `php artisan test --parallel`.
-3. **Resolver switch + feature test** — deriveExerciseType: `'weighted-carry','sled' => 'load_output'`;
-   keep `'dual-kettlebell','static-hold' => 'static_hold'`. Feature test: sync a carry + a sled, assert the
-   correct pr_type rows written.
+3. **Resolver switch + display/form/table consumers + feature tests** — deriveExerciseType:
+   `'weighted-carry','sled' => 'load_output'`; keep `'dual-kettlebell','static-hold' => 'static_hold'`.
+   Logging form is config-driven (load_output form_fields weight/distance/distance_unit/time — assert the
+   form definition). PR table (`PRRecordsComponentAssembler`): PUSH the per-type comparison out of
+   `getComparisonValue`'s switch INTO `strategy->comparisonValue()` (assembler delegates; switch shrinks —
+   do NOT add load/distance/duration/speed arms to the switch); add `speed` composite-key to the
+   beaten-PR-map de-dupe. Verify PR-row styling: a load_output PR sets `is_pr`/`pr_count` → `row-pr` +
+   badge (string-agnostic; feature-test the flag). Feature test: sync a carry + a sled, assert correct
+   pr_type rows.
 4. **Checkpoint** — `php artisan test --parallel`.
 5. **Re-typing migration + recompute + drop sled_*** — Migration B, strict order: (1) update exercises
    (+ dependent lift_logs) scoped by `log_type IN ('sled','weighted-carry')`; (2) recompute affected via
@@ -116,6 +125,10 @@ Follow the phases in `docs/plans/sled-carry-load-output.md` in order. Each numbe
       `LoadOutputExerciseType` LOC ≤ deleted `SledExerciseType`; net production LOC ≤ 0 (excluding
       tests/migrations); no `switch`/`match` on exercise-type string outside the config map. Report
       before/after LOC in the retro.
+- [ ] **PR-table comparison lives in the strategy** (`comparisonValue()`); `getComparisonValue`'s switch
+      shrinks to a delegator (not grown with new arms); `speed` composite-key added to the beaten-PR-map.
+- [ ] **Logging form** for load_output shows weight/distance/distance_unit/time (config-driven, tested).
+- [ ] **PR-row styling verified:** a load_output PR flips `is_pr`/`pr_count` → `row-pr` + badge (no new code).
 - [ ] `personal_records.pr_type` includes `load`/`distance`/`duration`/`speed`; `sled_*` removed post-recompute.
 - [ ] `LoadOutputExerciseType`: load via UnitResolver; distance integer meters; duration integer seconds;
       speed = min duration at matched (load, integer-distance).
