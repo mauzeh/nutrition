@@ -66,10 +66,15 @@ Follow the phases in `docs/plans/sled-carry-load-output.md` in order. Each numbe
 
 ### Phase order:
 1. **Enum migration (additive) + LoadOutputExerciseType + config + unit tests** — add the 4 strings to the
-   enum (keep sled_* for now); build the strategy (load via UnitResolver, distance integer meters via a
-   centralized ft→m helper, duration integer seconds, speed = min at matched load+distance); register the
-   `load_output` config key (form_fields weight/distance/distance_unit/time, duration cap 900); unit tests
-   incl. cross-unit load (D1), ft→m normalization, and speed PR / non-PR / different-bucket.
+   enum (keep sled_* for now); build the strategy. Route EVERY record's win/lose decision through ONE
+   private helper `beats($current, $stored, $direction)` (max = `>`, min = `<`) — do NOT re-inline the
+   comparison per record the way SledExerciseType does. `load` via UnitResolver (D1); `distance` integer
+   meters via a centralized ft→m helper (D4); `duration` integer seconds; `speed` = `beats(...,'min')` on
+   the PINNED bucket: key `"{loadComp}|{integerMeters}"`, value integer seconds, strictly-less-than at the
+   exact bucket, first entry = baseline (not a PR). Register the `load_output` config key (form_fields
+   weight/distance/distance_unit/time, duration cap 900). Unit tests incl. cross-unit load (D1), ft→m
+   normalization, speed PR / non-PR (equal or longer) / different-bucket. Keep `LoadOutputExerciseType`
+   LOC ≤ the deleted SledExerciseType.
 2. **Checkpoint** — `php artisan test --parallel`.
 3. **Resolver switch + feature test** — deriveExerciseType: `'weighted-carry','sled' => 'load_output'`;
    keep `'dual-kettlebell','static-hold' => 'static_hold'`. Feature test: sync a carry + a sled, assert the
@@ -105,6 +110,10 @@ Follow the phases in `docs/plans/sled-carry-load-output.md` in order. Each numbe
 - Re-type scoped by `log_type` only. Recompute via `PRRecalculationService`.
 
 ## Success Criteria
+- [ ] **Simpler:** one comparison helper `beats()` used by all records (no per-record inlined compare);
+      `LoadOutputExerciseType` LOC ≤ deleted `SledExerciseType`; net production LOC ≤ 0 (excluding
+      tests/migrations); no `switch`/`match` on exercise-type string outside the config map. Report
+      before/after LOC in the retro.
 - [ ] `personal_records.pr_type` includes `load`/`distance`/`duration`/`speed`; `sled_*` removed post-recompute.
 - [ ] `LoadOutputExerciseType`: load via UnitResolver; distance integer meters; duration integer seconds;
       speed = min duration at matched (load, integer-distance).

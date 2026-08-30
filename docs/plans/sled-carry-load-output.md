@@ -107,10 +107,14 @@ Checkpoints use `php artisan test --parallel`.
     raw int — closes D1); `distance` = farthest single-set integer meters (centralized ft→m helper — D4);
     `duration` = longest single-set integer seconds; plus per-set tuples for `speed` (each set's
     (load, integerDistance, duration) where all three present).
-  - `compareToPrevious()`: emit `load`/`distance`/`duration` with strict `>` (max direction); emit `speed`
-    when a current set's duration is strictly LESS than the stored best duration at the SAME
-    (load, integerDistance) bucket. First-ever log fires the max records if non-zero; `speed` fires only
-    when a matching bucket exists in history (or per the contract fixture's first-log rule — match Athlete).
+  - `compareToPrevious()`: route EVERY record through one private `beats($current, $stored, $direction)`
+    helper (max = `$current > $stored`; min = `$current < $stored`) — do not re-inline the comparison per
+    record. `load`/`distance`/`duration` use `direction='max'`; `speed` uses `direction='min'`.
+    **Pinned `speed` rule (identical to Athlete + fixture):** bucket key = `"{loadComp}|{integerMeters}"`
+    (loadComp = load in base unit; integerMeters = `normalizeDistanceToMeters(distance, unit)`); compared
+    value = integer seconds; a `speed` PR fires when a set's duration is **strictly less** than the stored
+    best at that **exact** bucket; the first entry at a bucket is the baseline, NOT a PR. `load`/`distance`/
+    `duration` fire on first-ever log if non-zero (match Athlete + the fixture).
   - `formatPRDisplay()`/`formatCurrentPRDisplay()`: the four labels above; `speed` shows the load+distance
     context ("Fastest 60 kg × 200 m" style) and duration value.
   - `getSupportedPRTypes()`: non-empty (gate only).
@@ -162,6 +166,26 @@ Tests asserting old shape: `static_hold` tests using a carry fixture; sled PR te
 List and update/remove them in the prompt.
 
 ---
+
+## Simplicity Criteria (this change must make the code simpler — enforce, don't hope)
+
+Goal: fewer conditional branches, better layer decoupling, less production code. Pass/fail at review:
+
+- **One deleted type, one added — and the new one is not bigger.** `LoadOutputExerciseType` LOC ≤ the
+  deleted `SledExerciseType` LOC. If the clone-and-generalize grows it, refactor before finishing.
+- **Comparison in ONE place.** Put the win/lose/direction/tolerance decision in a single private helper on
+  the strategy (e.g. `beats($current, $stored, string $direction)`), used by every record (load/distance/
+  duration/speed). Do NOT copy the strict-`>` comparison per record the way `SledExerciseType` does; `speed`
+  is that helper with `direction='min'`, not a new branch.
+- **A whole routing branch is removed:** `weighted-carry` (and `sled`) leave their old arms; `static_hold`
+  no longer conceptually carries a movement it shouldn't. Net fewer special cases.
+- **No new `switch`/`match` on the exercise-type string** outside the config `types` map. Dispatch stays
+  config-driven (a new key), not an `if`.
+- **Net production LOC ≤ 0** for the change (excluding tests/migrations): deleting `SledExerciseType` + its
+  config key + `sled_*` display arms should offset the new strategy. Report before/after in the retro.
+- **Layer decoupling:** the strategy computes metrics + PRs; label copy lives in the `formatPRDisplay`/
+  `formatCurrentPRDisplay` match arms only; load normalization happens only via `UnitResolver`; ft→m via the
+  one centralized helper. No unit math inlined in the metric loop beyond calling those.
 
 ## Hard Rules
 - **NEVER commit or push** (§3). **NEVER run Pint** (safe-operations wins). **NEVER destructive DB**
