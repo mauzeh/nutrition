@@ -26,11 +26,27 @@ return new class extends Migration
 
         \App\Services\ExerciseTypes\ExerciseTypeFactory::clearCache();
 
-        // 2. Clean up legacy sled_* PR records & recompute PRs for all users of affected exercises
-        DB::table('personal_records')
+        // 2. Break self-referential previous_pr_id links that point AT sled_* rows before any
+        //    delete. personal_records.previous_pr_id is a self-FK with ON DELETE NO ACTION, so
+        //    MySQL checks it row-by-row mid-statement: deleting a parent sled_* row before its
+        //    child within the same DELETE transiently violates the constraint and the whole delete
+        //    fails. Nulling these references first lets the per-exercise recompute delete the rows.
+        //    (Recompute regenerates the PRs anyway, so previous_pr_id linkage on old rows is moot.)
+        $sledPrIds = DB::table('personal_records')
             ->whereIn('pr_type', ['sled_weight', 'sled_distance', 'sled_volume'])
-            ->delete();
+            ->pluck('id');
 
+        if ($sledPrIds->isNotEmpty()) {
+            DB::table('personal_records')
+                ->whereIn('previous_pr_id', $sledPrIds)
+                ->update(['previous_pr_id' => null]);
+        }
+
+        // 3. Recompute PRs for all users of affected exercises. PRRecalculationService deletes ALL
+        //    PRs for each (user, exercise) then rebuilds under the new load_output strategy — this
+        //    clears the legacy sled_* rows (now unreferenced) and regenerates load/distance/duration/
+        //    speed rows. Do NOT add a blanket DELETE WHERE pr_type IN (sled_*): it violates the
+        //    self-FK for the same reason as above.
         $recalculator = app(PRRecalculationService::class);
         foreach ($affectedExercises as $exercise) {
             $userIds = DB::table('lift_logs')
@@ -43,7 +59,16 @@ return new class extends Migration
             }
         }
 
-        // 3. ASSERT zero remaining sled_* records before dropping
+        // 4. Hard-delete any remaining sled_* rows. PersonalRecord uses SoftDeletes, so the
+        //    recompute's Eloquent ->delete() only set deleted_at on the old sled_* rows — they are
+        //    still physically present (and still carry the sled_* enum value we're about to drop).
+        //    A raw query-builder delete bypasses the soft-delete scope and physically removes them.
+        //    Their inbound previous_pr_id refs were nulled in step 2, so this won't hit the self-FK.
+        DB::table('personal_records')
+            ->whereIn('pr_type', ['sled_weight', 'sled_distance', 'sled_volume'])
+            ->delete();
+
+        // 5. ASSERT zero remaining sled_* records (raw count includes soft-deleted) before dropping.
         $remainingSledPrCount = DB::table('personal_records')
             ->whereIn('pr_type', ['sled_weight', 'sled_distance', 'sled_volume'])
             ->count();
