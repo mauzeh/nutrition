@@ -509,13 +509,22 @@ class Exercise extends Model
         return app(\App\Services\ExerciseAliasService::class)->getDisplayName($this, $user);
     }
 
-    /**
-     * Check if this exercise has an alias for a specific user
-     * Requirements: 2.1, 2.2, 3.1, 3.2, 4.1, 4.2
-     */
     public function hasAliasForUser(User $user): bool
     {
         return app(\App\Services\ExerciseAliasService::class)->hasAlias($user, $this);
     }
 
+    public function getLogTypeAttribute($value): string
+    {
+        if ($value) {
+            return $value;
+        }
+
+        return match ($this->exercise_type) {
+            'bodyweight' => 'bodyweight',
+            'cardio' => 'cardio',
+            'static_hold' => 'static_hold',
+            default => 'regular',
+        };
+    }
 }

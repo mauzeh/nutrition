@@ -76,6 +76,9 @@ class PRRecordsComponentAssembler
     /**
      * Get PR records for beaten PRs in table format
      */
+    /**
+     * Get PR records for beaten PRs in table format
+     */
     private static function getPRRecordsForBeatenPRs(LiftLog $liftLog): array
     {
         // Check if this is the first lift for this exercise
@@ -100,16 +103,21 @@ class PRRecordsComponentAssembler
             return [];
         }
         
-        // Get the exercise type strategy for formatting
-        $strategy = $liftLog->exercise->getTypeStrategy();
-        
+        $prEngine = app(\App\Services\PR\PrEngine::class);
+        $family = $prEngine->resolveFamily($liftLog->exercise->log_type ?? 'regular');
+        $descriptors = config("pr_families.families.{$family}", []);
+        $descriptorMap = array_column($descriptors, null, 'type');
+
         $records = [];
         
-        // Use the strategy's formatPRDisplay method for each PR
+        $hasOneRepPR = $prs->contains(fn($p) => $p->pr_type === 'rep_specific' && (int)$p->rep_count === 1);
+
         foreach ($prs as $pr) {
-            $formatted = $strategy->formatPRDisplay($pr, $liftLog);
-            
-            // Skip if the strategy returns empty array (e.g., redundant 1RM)
+            if ($pr->pr_type === 'one_rm' && $hasOneRepPR) {
+                continue;
+            }
+            $descriptor = $descriptorMap[$pr->pr_type] ?? null;
+            $formatted = self::formatPRRecord($pr, $liftLog, $descriptor, isBeaten: true);
             if (!empty($formatted)) {
                 $records[] = $formatted;
             }
@@ -123,7 +131,6 @@ class PRRecordsComponentAssembler
      */
     private static function getCurrentRecordsTable(LiftLog $liftLog): array
     {
-        // Use PersonalRecord database records to get current PRs
         $currentPRs = \App\Models\PersonalRecord::where('user_id', $liftLog->user_id)
             ->where('exercise_id', $liftLog->exercise_id)
             ->current() // Only unbeaten PRs
@@ -133,66 +140,44 @@ class PRRecordsComponentAssembler
             return [];
         }
         
-        $strategy = $liftLog->exercise->getTypeStrategy();
+        $beatenPRs = \App\Models\PersonalRecord::where('lift_log_id', $liftLog->id)->get();
         
-        // Get PRs that were beaten by THIS lift (to exclude from current records)
-        $beatenPRs = \App\Models\PersonalRecord::where('lift_log_id', $liftLog->id)
-            ->get();
-        
-        // Create a map of beaten PR types with their specific details
         $beatenPRMap = [];
         foreach ($beatenPRs as $pr) {
-            if ($pr->pr_type === 'rep_specific') {
-                $beatenPRMap['rep_specific_' . $pr->rep_count] = true;
-            } elseif ($pr->pr_type === 'hypertrophy') {
-                $beatenPRMap['hypertrophy_' . $pr->weight] = true;
-            } elseif ($pr->pr_type === 'density') {
-                // Density PRs are weight/duration-specific
-                $beatenPRMap['density_' . $pr->weight . '_' . $pr->rep_count] = true;
-            } elseif ($pr->pr_type === 'consistency') {
-                // Consistency PRs are set-count-specific
-                $beatenPRMap['consistency_' . $pr->rep_count] = true;
-            } elseif ($pr->pr_type === 'speed') {
-                $beatenPRMap['speed_' . $pr->weight . '_' . $pr->rep_count] = true;
-            } elseif ($pr->pr_type === 'time') {
-                $beatenPRMap['time'] = true;
-            } elseif ($pr->pr_type === 'endurance') {
-                $beatenPRMap['endurance'] = true;
-            } else {
-                $beatenPRMap[$pr->pr_type] = true;
+            $key = $pr->pr_type;
+            if ($pr->rep_count) {
+                $key .= '_' . $pr->rep_count;
             }
+            if ($pr->weight) {
+                $key .= '_' . $pr->weight;
+            }
+            $beatenPRMap[$key] = true;
         }
         
+        $prEngine = app(\App\Services\PR\PrEngine::class);
+        $family = $prEngine->resolveFamily($liftLog->exercise->log_type ?? 'regular');
+        $descriptors = config("pr_families.families.{$family}", []);
+        $descriptorMap = array_column($descriptors, null, 'type');
+
+        $currentMetrics = $prEngine->computeMetrics($liftLog, $family);
         $records = [];
         
-        // Calculate current metrics using the strategy
-        $currentMetrics = $strategy->calculateCurrentMetrics($liftLog);
-        
-        // Filter out beaten PRs and format using strategy
         foreach ($currentPRs as $pr) {
-            // Check if this PR was beaten
             $key = $pr->pr_type;
-            if ($pr->pr_type === 'rep_specific') {
-                $key = 'rep_specific_' . $pr->rep_count;
-            } elseif ($pr->pr_type === 'hypertrophy') {
-                $key = 'hypertrophy_' . $pr->weight;
-            } elseif ($pr->pr_type === 'density') {
-                $key = 'density_' . $pr->weight . '_' . $pr->rep_count;
-            } elseif ($pr->pr_type === 'consistency') {
-                $key = 'consistency_' . $pr->rep_count;
-            } elseif ($pr->pr_type === 'speed') {
-                $key = 'speed_' . $pr->weight . '_' . $pr->rep_count;
+            if ($pr->rep_count) {
+                $key .= '_' . $pr->rep_count;
+            }
+            if ($pr->weight) {
+                $key .= '_' . $pr->weight;
             }
             
             if (isset($beatenPRMap[$key])) {
-                continue; // Skip beaten PRs
+                continue;
             }
             
-            // Use strategy to format the PR display
-            $formatted = $strategy->formatCurrentPRDisplay($pr, $liftLog, true);
-            
-            // Add comparison value based on current metrics
-            $comparison = self::getComparisonValue($pr, $currentMetrics, $liftLog, $strategy);
+            $descriptor = $descriptorMap[$pr->pr_type] ?? null;
+            $formatted = self::formatPRRecord($pr, $liftLog, $descriptor, isBeaten: false);
+            $comparison = self::getComparisonValue($pr, $currentMetrics, $liftLog, $descriptor);
             if ($comparison !== null) {
                 $formatted['comparison'] = $comparison;
                 $records[] = $formatted;
@@ -201,116 +186,108 @@ class PRRecordsComponentAssembler
         
         return $records;
     }
+
+    private static function formatPRRecord(\App\Models\PersonalRecord $pr, LiftLog $liftLog, ?array $descriptor, bool $isBeaten): array
+    {
+        $label = $descriptor['label'] ?? ucfirst(str_replace('_', ' ', $pr->pr_type));
+        $isPureBodyweight = ($liftLog->exercise->log_type ?? '') === 'bodyweight' && $pr->pr_type === 'volume' && ($pr->weight == 0 || $pr->weight === null);
+        
+        if ($isPureBodyweight) {
+            $label = 'Total Reps';
+        } elseif ($pr->pr_type === 'rep_specific' && $pr->rep_count) {
+            $label = $pr->rep_count . ' Rep' . ($pr->rep_count > 1 ? 's' : '');
+        } elseif ($pr->pr_type === 'hypertrophy' && $pr->weight) {
+            $label = 'Best @ ' . (float)$pr->weight . ' lbs';
+        }
+
+        $unitResolver = app(\App\Services\UnitResolver::class);
+        $viewer = auth()->user() ?? $liftLog->user;
+        $sourceUnit = $pr->unit ?? 'lbs';
+
+        $format = $descriptor['format'] ?? 'weight';
+        if ($isPureBodyweight) {
+            $format = 'reps';
+        }
+        $formattedValue = match ($format) {
+            'weight' => $unitResolver->formatForUser($pr->value, $sourceUnit, $viewer),
+            'volume' => $unitResolver->formatForUser($pr->value, $sourceUnit, $viewer),
+            'seconds' => (int)$pr->value . 's',
+            'reps' => (int)$pr->value . ' reps',
+            'sets' => (int)$pr->value . ' set' . ((int)$pr->value > 1 ? 's' : ''),
+            'distance' => (int)$pr->value . 'm',
+            default => (string)$pr->value,
+        };
+
+        if ($isBeaten) {
+            $formattedPrev = $pr->previous_value !== null ? match ($format) {
+                'weight' => $unitResolver->formatForUser($pr->previous_value, $sourceUnit, $viewer),
+                'volume' => $unitResolver->formatForUser($pr->previous_value, $sourceUnit, $viewer),
+                'seconds' => (int)$pr->previous_value . 's',
+                'reps' => (int)$pr->previous_value . ' reps',
+                'sets' => (int)$pr->previous_value . ' set' . ((int)$pr->previous_value > 1 ? 's' : ''),
+                'distance' => (int)$pr->previous_value . 'm',
+                default => (string)$pr->previous_value,
+            } : '—';
+
+            return [
+                'label' => $label,
+                'value' => $formattedPrev,
+                'comparison' => $formattedValue,
+            ];
+        }
+
+        return [
+            'label' => $label,
+            'value' => $formattedValue,
+            'is_current' => true,
+        ];
+    }
     
-    /**
-     * Get comparison value for a PR based on current metrics
-     */
     private static function getComparisonValue(
         \App\Models\PersonalRecord $pr,
         array $currentMetrics,
         LiftLog $liftLog,
-        $strategy
+        ?array $descriptor
     ): ?string {
-        if (method_exists($strategy, 'comparisonValue')) {
-            $value = $strategy->comparisonValue($pr, $currentMetrics, $liftLog);
-            if ($value !== null) {
-                return $value;
+        if (!$descriptor || !isset($currentMetrics[$pr->pr_type])) {
+            return null;
+        }
+
+        $currentVal = $currentMetrics[$pr->pr_type];
+        $unitResolver = app(\App\Services\UnitResolver::class);
+        $viewer = auth()->user() ?? $liftLog->user;
+        $loggedUnit = $liftLog->liftSets->first()->unit ?? 'lbs';
+        $format = $descriptor['format'] ?? 'weight';
+
+        if (is_numeric($currentVal)) {
+            return match ($format) {
+                'weight' => $unitResolver->formatForUser($currentVal, $loggedUnit, $viewer),
+                'volume' => $unitResolver->formatForUser($currentVal, $loggedUnit, $viewer),
+                'seconds' => (int)$currentVal . 's',
+                'reps' => (int)$currentVal . ' reps',
+                'sets' => (int)$currentVal . ' set' . ((int)$currentVal > 1 ? 's' : ''),
+                'distance' => (int)$currentVal . 'm',
+                default => (string)$currentVal,
+            };
+        }
+
+        if (is_array($currentVal)) {
+            $key = $pr->rep_count ?? (string)$pr->weight;
+            if (isset($currentVal[$key])) {
+                $val = $currentVal[$key];
+                return match ($format) {
+                    'weight' => $unitResolver->formatForUser($val, $loggedUnit, $viewer),
+                    'volume' => $unitResolver->formatForUser($val, $loggedUnit, $viewer),
+                    'seconds' => (int)$val . 's',
+                    'reps' => (int)$val . ' reps',
+                    'sets' => (int)$val . ' set' . ((int)$val > 1 ? 's' : ''),
+                    'distance' => (int)$val . 'm',
+                    default => (string)$val,
+                };
             }
         }
 
-        $isBodyweight = $liftLog->exercise->exercise_type === 'bodyweight';
-        $isStaticHold = $liftLog->exercise->exercise_type === 'static_hold';
-        $isCardio = $liftLog->exercise->exercise_type === 'cardio';
-        $hasExtraWeight = $liftLog->liftSets->max('weight') > 0;
-        
-        switch ($pr->pr_type) {
-            case 'one_rm':
-                if (!$isBodyweight && isset($currentMetrics['best_1rm'])) {
-                    $unitResolver = app(\App\Services\UnitResolver::class);
-                    $loggedUnit = $liftLog->liftSets->first()->unit ?? 'lbs';
-                    return $unitResolver->formatForUser($currentMetrics['best_1rm'], $loggedUnit, $liftLog->user);
-                }
-                return null;
-                
-            case 'volume':
-                // Static holds: use formatVolumeDuration via strategy
-                if ($isStaticHold && isset($currentMetrics['total_volume'])) {
-                    $tempPR = new \App\Models\PersonalRecord();
-                    $tempPR->pr_type = 'volume';
-                    $tempPR->value = $currentMetrics['total_volume'];
-                    $formatted = $strategy->formatCurrentPRDisplay($tempPR, $liftLog, false);
-                    return $formatted['value'];
-                }
-                // Cardio: use strategy formatting
-                elseif ($isCardio && isset($currentMetrics['total_volume'])) {
-                    $tempPR = new \App\Models\PersonalRecord();
-                    $tempPR->pr_type = 'volume';
-                    $tempPR->value = $currentMetrics['total_volume'];
-                    $formatted = $strategy->formatCurrentPRDisplay($tempPR, $liftLog, false);
-                    return $formatted['value'];
-                }
-                // Bodyweight: show total reps
-                elseif ($isBodyweight && !$hasExtraWeight && isset($currentMetrics['total_reps'])) {
-                    return sprintf('%d reps', (int)$currentMetrics['total_reps']);
-                }
-                // Weighted exercises: show weight × reps
-                elseif (isset($currentMetrics['total_volume'])) {
-                    $unitResolver = app(\App\Services\UnitResolver::class);
-                    $loggedUnit = $liftLog->liftSets->first()->unit ?? 'lbs';
-                    return $unitResolver->formatForUser($currentMetrics['total_volume'], $loggedUnit, $liftLog->user);
-                }
-                return null;
-                
-            case 'rep_specific':
-                if (isset($currentMetrics['rep_weights'][$pr->rep_count])) {
-                    $currentWeight = $currentMetrics['rep_weights'][$pr->rep_count];
-                    $unitResolver = app(\App\Services\UnitResolver::class);
-                    $loggedUnit = $liftLog->liftSets->first()->unit ?? 'lbs';
-                    return $unitResolver->formatForUser($currentWeight, $loggedUnit, $liftLog->user);
-                }
-                return null;
-                
-            case 'hypertrophy':
-                return null;
-                
-            case 'time':
-                if (isset($currentMetrics['best_hold'])) {
-                    $tempPR = new \App\Models\PersonalRecord();
-                    $tempPR->pr_type = 'time';
-                    $tempPR->value = $currentMetrics['best_hold'];
-                    $formatted = $strategy->formatCurrentPRDisplay($tempPR, $liftLog, false);
-                    return $formatted['value'];
-                }
-                return null;
-                
-            case 'consistency':
-                if (isset($currentMetrics['min_hold']) && isset($currentMetrics['total_sets'])) {
-                    $tempPR = new \App\Models\PersonalRecord();
-                    $tempPR->pr_type = 'consistency';
-                    $tempPR->value = $currentMetrics['min_hold'];
-                    $tempPR->rep_count = $currentMetrics['total_sets'];
-                    $formatted = $strategy->formatCurrentPRDisplay($tempPR, $liftLog, false);
-                    return $formatted['value'];
-                }
-                return null;
-                
-            case 'density':
-                // Density PRs are weight/duration-specific, so we can't show a simple comparison
-                return null;
-                
-            case 'endurance':
-                if (isset($currentMetrics['best_distance'])) {
-                    $tempPR = new \App\Models\PersonalRecord();
-                    $tempPR->pr_type = 'endurance';
-                    $tempPR->value = $currentMetrics['best_distance'];
-                    $formatted = $strategy->formatCurrentPRDisplay($tempPR, $liftLog, false);
-                    return $formatted['value'];
-                }
-                return null;
-                
-            default:
-                return null;
-        }
+        return null;
     }
     
     /**

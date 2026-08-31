@@ -75,12 +75,12 @@ class LoadOutputIntegrationTest extends TestCase
         $this->assertTrue((bool) $log->is_pr);
         $this->assertGreaterThan(0, $log->pr_count);
 
-        // Verify isLiftLogPR returns a non-zero bitmask flag
+        // Verify isLiftLogPR returns string array containing detected PR types
         $detectService = app(\App\Services\PRDetectionService::class);
-        $prFlags = $detectService->isLiftLogPR($log, $exercise, $user);
-        $this->assertGreaterThan(0, $prFlags);
-        $this->assertTrue(\App\Enums\PRType::LOAD->isIn($prFlags));
-        $this->assertTrue(\App\Enums\PRType::DISTANCE->isIn($prFlags));
-        $this->assertTrue(\App\Enums\PRType::DURATION->isIn($prFlags));
+        $prTypes = $detectService->isLiftLogPR($log, $exercise, $user);
+        $this->assertNotEmpty($prTypes);
+        $this->assertContains('load', $prTypes);
+        $this->assertContains('distance', $prTypes);
+        $this->assertContains('duration', $prTypes);
     }
 }

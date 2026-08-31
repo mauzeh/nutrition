@@ -85,6 +85,12 @@ class AppServiceProvider extends ServiceProvider
         PRComment::observe(PRCommentObserver::class);
         PRHighFive::observe(PRHighFiveObserver::class);
 
+        // Register event listeners
+        \Illuminate\Support\Facades\Event::listen(
+            \App\Events\LiftLogCompleted::class,
+            \App\Listeners\DetectAndRecordPRs::class
+        );
+
         // Enable query log for non-production environments
         // 2025-11-09 Temporarily enabled across all environments to troubleshoot discrepancy
         // in recommendations between local and product for 1 user.

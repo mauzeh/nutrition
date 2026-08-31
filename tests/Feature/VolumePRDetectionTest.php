@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Enums\PRType;
 use App\Models\Exercise;
 use App\Models\LiftLog;
 use App\Models\User;
@@ -51,11 +50,11 @@ class VolumePRDetectionTest extends TestCase
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
         // Should be marked as a PR (volume PR and possibly rep PR)
-        $prFlags = session('is_pr');
-        $this->assertTrue($prFlags > 0);
+        $prTypes = session('is_pr');
+        $this->assertNotEmpty($prTypes);
         
         // Should have volume PR flag
-        $this->assertTrue(PRType::VOLUME->isIn($prFlags));
+        $this->assertContains('volume', $prTypes);
         
         $successMessage = session('success');
         $this->assertStringContainsString('PR!', $successMessage);
@@ -91,9 +90,10 @@ class VolumePRDetectionTest extends TestCase
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
         // Should NOT be marked as a PR
-        $response->assertSessionHas('is_pr', 0);
+        $prTypes = session('is_pr');
+        $this->assertEmpty($prTypes);
         
-        $successMessage = session('success');
+        $successMessage = session('success', '');
         $this->assertStringNotContainsString('PR!', $successMessage);
     }
 
@@ -115,7 +115,7 @@ class VolumePRDetectionTest extends TestCase
 
         // Second session: 120 lbs × 5 reps × 3 sets (heavier weight AND more volume)
         $liftLogData = [
-            'exercise_id' => $this->user->id,
+            'exercise_id' => $exercise->id,
             'weight' => 120,
             'reps' => 5,
             'rounds' => 3,
@@ -126,12 +126,12 @@ class VolumePRDetectionTest extends TestCase
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
         // Should be marked as a PR
-        $prFlags = session('is_pr');
-        $this->assertTrue($prFlags > 0);
+        $prTypes = session('is_pr');
+        $this->assertNotEmpty($prTypes);
         
         // Should have both 1RM and Volume PR flags
-        $this->assertTrue(PRType::ONE_RM->isIn($prFlags));
-        $this->assertTrue(PRType::VOLUME->isIn($prFlags));
+        $this->assertContains('one_rm', $prTypes);
+        $this->assertContains('volume', $prTypes);
     }
 
     /** @test */
@@ -152,11 +152,12 @@ class VolumePRDetectionTest extends TestCase
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
         // Should be marked as a PR
-        $prFlags = session('is_pr');
-        $this->assertTrue($prFlags > 0);
+        $prTypes = session('is_pr');
+        $this->assertNotEmpty($prTypes);
         
         // First lift should have both 1RM and Volume PR flags
-        $this->assertTrue(PRType::ONE_RM->isIn($prFlags));
-        $this->assertTrue(PRType::VOLUME->isIn($prFlags));
+        $this->assertContains('one_rm', $prTypes);
+        $this->assertContains('volume', $prTypes);
     }
 }
+

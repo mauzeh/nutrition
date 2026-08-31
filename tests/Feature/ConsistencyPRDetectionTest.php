@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Enums\PRType;
 use App\Models\Exercise;
 use App\Models\LiftLog;
 use App\Models\PersonalRecord;
@@ -338,12 +337,14 @@ class ConsistencyPRDetectionTest extends TestCase
             ->where('pr_type', 'consistency')
             ->first();
 
-        $strategy = $this->exercise->getTypeStrategy();
-        $display = $strategy->formatPRDisplay($pr, $secondLog);
+        $config = new \App\Services\LiftLogTableRowBuilder\RowConfig();
+        $assembled = \App\Services\LiftLogTableRowBuilder\PRRecordsComponentAssembler::assemble($secondLog, $config);
+        $records = $assembled[0]['data']['records'] ?? [];
+        $consistencyRecord = collect($records)->firstWhere('label', 'Best Min Hold');
 
-        $this->assertEquals('Min Hold (3 sets)', $display['label']);
-        $this->assertEquals('10s hold', $display['value']);
-        $this->assertEquals('15s hold', $display['comparison']);
+        $this->assertNotNull($consistencyRecord);
+        $this->assertEquals('10s', $consistencyRecord['value']);
+        $this->assertEquals('15s', $consistencyRecord['comparison']);
     }
 
     /** @test */

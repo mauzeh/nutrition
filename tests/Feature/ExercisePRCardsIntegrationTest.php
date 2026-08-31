@@ -240,6 +240,8 @@ class ExercisePRCardsIntegrationTest extends TestCase
             'weight' => $weight,
         ]);
 
+        event(new \App\Events\LiftLogCompleted($liftLog));
+
         return $liftLog;
     }
 
@@ -372,6 +374,8 @@ class ExercisePRCardsIntegrationTest extends TestCase
             'weight' => $weight,
         ]);
 
+        event(new \App\Events\LiftLogCompleted($liftLog));
+
         return $liftLog;
     }
 
@@ -410,8 +414,8 @@ class ExercisePRCardsIntegrationTest extends TestCase
         ]);
 
         // Create PRs from several months ago
-        $this->createLiftLogWithDate($exercise, 1, 405, Carbon::parse('2024-08-30'));
-        $this->createLiftLogWithDate($exercise, 2, 385, Carbon::parse('2024-06-30'));
+        $this->createLiftLogWithDate($exercise, 1, 405, Carbon::now()->subYears(2));
+        $this->createLiftLogWithDate($exercise, 2, 385, Carbon::now()->subYears(3));
 
         $response = $this->get(route('exercises.show-logs', $exercise));
 
@@ -419,8 +423,7 @@ class ExercisePRCardsIntegrationTest extends TestCase
         $response->assertSee('Heaviest Lifts');
         
         // Check that time ago labels are displayed for old PRs
-        // Since we're in December 2024, dates from earlier in 2024 show as "1 year ago"
-        $response->assertSee('1 year ago');
+        $response->assertSee('2 years ago');
     }
 
     /** @test */
@@ -477,21 +480,26 @@ class ExercisePRCardsIntegrationTest extends TestCase
             'title' => 'Overhead Press',
         ]);
 
-        // Create multiple lifts, but only the heaviest should be shown with its date
-        $this->createLiftLogWithDate($exercise, 1, 135, Carbon::now()->subMonths(6)); // Older, lighter
-        $this->createLiftLogWithDate($exercise, 1, 155, Carbon::now()->subMonths(2)); // Newer, heavier (this should be shown)
-        $this->createLiftLogWithDate($exercise, 1, 145, Carbon::now()->subWeeks(1)); // Newest, but lighter
+        // Create multiple lifts, but only the heaviest (155) should be shown with its date
+        $this->createLiftLogWithDate($exercise, 1, 135, Carbon::now()->subDays(150)); // Older, lighter (5 months)
+        $this->createLiftLogWithDate($exercise, 1, 155, Carbon::now()->subDays(75)); // Newer, heaviest (this should be shown - 2 months ago)
+        $this->createLiftLogWithDate($exercise, 1, 145, Carbon::now()->subDays(10)); // Newest, but lighter
 
         $response = $this->get(route('exercises.show-logs', $exercise));
 
         $response->assertStatus(200);
         $response->assertSee('Heaviest Lifts');
         $response->assertSee('155'); // Should show the heaviest weight
-        $response->assertSee('2 months ago'); // Should show the date of the heaviest lift
         
-        // Should not show dates of the lighter lifts in the PR card
-        $response->assertDontSee('6 months ago');
-        $response->assertDontSee('1 week ago');
+        // Ensure 2 months ago is in PR cards section and other dates are not
+        $content = $response->getContent();
+        $prCardsPos = strpos($content, 'component-pr-cards-section');
+        $calcPos = strpos($content, 'component-calculator', $prCardsPos);
+        $prCardsHtml = substr($content, $prCardsPos, $calcPos - $prCardsPos);
+        
+        $this->assertStringContainsString('2 months ago', $prCardsHtml);
+        $this->assertStringNotContainsString('5 months ago', $prCardsHtml);
+        $this->assertStringNotContainsString('10 days ago', $prCardsHtml);
     }
 
     /** @test */

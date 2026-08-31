@@ -46,6 +46,8 @@ class ExercisePRService
         $liftLogs = $exercise->liftLogs()
             ->where('user_id', $user->id)
             ->with('liftSets')
+            ->orderBy('logged_at', 'asc')
+            ->orderBy('id', 'asc')
             ->get();
 
         // If no lift logs exist, return null

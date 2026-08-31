@@ -268,13 +268,11 @@ class LiftLogController extends Controller
         
         $liftLog->delete();
         
-        // If this was a PR, recalculate all PRs for this exercise
-        if ($wasPR) {
-            app(\App\Services\PRRecalculationService::class)->recalculateAllPRsForExercise(
-                $userId,
-                $exerciseId
-            );
-        }
+        // Recalculate all PRs for this exercise upon deletion
+        app(\App\Services\PRRecalculationService::class)->recalculateAllPRsForExercise(
+            $userId,
+            $exerciseId
+        );
 
         return $this->redirectService->getRedirect(
             'lift_logs',

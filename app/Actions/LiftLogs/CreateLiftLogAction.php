@@ -2,7 +2,6 @@
 
 namespace App\Actions\LiftLogs;
 
-use App\Enums\PRType;
 use App\Events\LiftLogged;
 use App\Events\LiftLogCompleted;
 use App\Models\Exercise;
@@ -46,6 +45,9 @@ class CreateLiftLogAction
         // Dispatch event for PR detection (synchronous)
         LiftLogCompleted::dispatch($liftLog, false);
         
+        $liftLog->refresh();
+        $liftLog->load(['exercise', 'liftSets']);
+
         // Check if this is a PR
         $prFlags = $this->checkIfPR($liftLog, $exercise, $user);
         
@@ -177,25 +179,25 @@ class CreateLiftLogAction
         }
     }
     
-    private function checkIfPR(LiftLog $liftLog, Exercise $exercise, User $user): int
+    private function checkIfPR(LiftLog $liftLog, Exercise $exercise, User $user): array
     {
-        $prFlags = $this->prDetectionService->isLiftLogPR($liftLog, $exercise, $user);
+        $prTypes = $this->prDetectionService->isLiftLogPR($liftLog, $exercise, $user);
         
         // Log the PR detection result for debugging and support
         PRDetectionLog::create([
             'lift_log_id' => $liftLog->id,
             'user_id' => $user->id,
             'exercise_id' => $exercise->id,
-            'pr_types_detected' => PRType::toArray($prFlags),
+            'pr_types_detected' => $prTypes,
             'calculation_snapshot' => $this->prDetectionService->getLastCalculationSnapshot() ?? [],
             'trigger_event' => 'created',
             'detected_at' => now(),
         ]);
         
-        return $prFlags;
+        return $prTypes;
     }
     
-    private function generateSuccessMessage(Exercise $exercise, $weight, int $reps, int $rounds, ?string $bandColor = null, int $prFlags = 0): string
+    private function generateSuccessMessage(Exercise $exercise, $weight, int $reps, int $rounds, ?string $bandColor = null, array $prTypes = []): string
     {
         // Get display name (alias if exists, otherwise title)
         $exerciseTitle = $this->exerciseAliasService->getDisplayName($exercise, Auth::user());
@@ -216,8 +218,8 @@ class CreateLiftLogAction
         $message = str_replace([':exercise', ':details'], [$exerciseTitle, $workoutDescription], $randomTemplate);
         
         // Add PR indicator if this is a personal record
-        if ($prFlags > 0) {
-            $message .= ' ' . PRType::getBestLabel($prFlags);
+        if (!empty($prTypes)) {
+            $message .= ' 🏆 PR!';
         }
         
         return $message;

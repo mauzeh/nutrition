@@ -2,7 +2,6 @@
 
 namespace App\Actions\LiftLogs;
 
-use App\Enums\PRType;
 use App\Events\LiftLogCompleted;
 use App\Models\Exercise;
 use App\Models\LiftLog;
@@ -45,6 +44,9 @@ class UpdateLiftLogAction
         // Delete existing lift sets and create new ones
         $this->updateLiftSets($request, $liftLog, $exercise);
         
+        $liftLog->refresh();
+        $liftLog->load(['exercise', 'liftSets']);
+
         // Dispatch event for PR recalculation (synchronous)
         LiftLogCompleted::dispatch($liftLog, true);
         
@@ -140,14 +142,14 @@ class UpdateLiftLogAction
     
     private function checkAndLogPR(LiftLog $liftLog, Exercise $exercise, User $user): void
     {
-        $prFlags = $this->prDetectionService->isLiftLogPR($liftLog, $exercise, $user);
+        $prTypes = $this->prDetectionService->isLiftLogPR($liftLog, $exercise, $user);
         
         // Log the PR detection result for debugging and support
         PRDetectionLog::create([
             'lift_log_id' => $liftLog->id,
             'user_id' => $user->id,
             'exercise_id' => $exercise->id,
-            'pr_types_detected' => PRType::toArray($prFlags),
+            'pr_types_detected' => $prTypes,
             'calculation_snapshot' => $this->prDetectionService->getLastCalculationSnapshot() ?? [],
             'trigger_event' => 'updated',
             'detected_at' => now(),

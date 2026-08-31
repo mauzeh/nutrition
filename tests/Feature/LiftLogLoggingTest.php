@@ -456,11 +456,11 @@ class LiftLogLoggingTest extends TestCase {
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
         // First lift should be marked as PR
-        $response->assertSessionHas('is_pr', true);
+        $this->assertNotEmpty(session('is_pr'));
         
         // Success message should contain PR indicator
         $successMessage = session('success');
-        $this->assertStringContainsString('NEW PR!', $successMessage);
+        $this->assertStringContainsString('PR!', $successMessage);
     }
 
     /** @test */
@@ -494,11 +494,11 @@ class LiftLogLoggingTest extends TestCase {
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
         // Heavier lift should be marked as PR
-        $response->assertSessionHas('is_pr', true);
+        $this->assertNotEmpty(session('is_pr'));
         
         // Success message should contain PR indicator
         $successMessage = session('success');
-        $this->assertStringContainsString('NEW PR!', $successMessage);
+        $this->assertStringContainsString('PR!', $successMessage);
     }
 
     /** @test */
@@ -517,6 +517,7 @@ class LiftLogLoggingTest extends TestCase {
             ['weight' => 120, 'reps' => 5, 'notes' => 'Heavy lift set 2'],
             ['weight' => 120, 'reps' => 5, 'notes' => 'Heavy lift set 3'],
         ]);
+        $this->triggerPRDetection($firstLiftLog);
 
         // Log second lift at 100 lbs × 5 reps × 3 sets = 1500 lbs volume (lighter weight, less volume = not a PR)
         $liftLogData = [
@@ -532,7 +533,7 @@ class LiftLogLoggingTest extends TestCase {
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
         // Lighter lift with less volume should NOT be marked as PR
-        $response->assertSessionHas('is_pr', 0);
+        $this->assertEmpty(session('is_pr'));
         
         // Success message should NOT contain PR indicator
         $successMessage = session('success');
@@ -570,7 +571,7 @@ class LiftLogLoggingTest extends TestCase {
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
         // Equal weight and volume should NOT be marked as PR
-        $response->assertSessionHas('is_pr', 0);
+        $this->assertEmpty(session('is_pr'));
         
         // Success message should NOT contain PR indicator
         $successMessage = session('success');
@@ -624,6 +625,7 @@ class LiftLogLoggingTest extends TestCase {
             'reps' => 5,
             'notes' => 'First lift',
         ]);
+        $this->triggerPRDetection($firstLiftLog);
 
         // Log second lift at 120 lbs × 5 reps × 3 sets today (PR in both 1RM and volume)
         $secondLiftLog = \App\Models\LiftLog::factory()->create([
@@ -636,6 +638,7 @@ class LiftLogLoggingTest extends TestCase {
             ['weight' => 120, 'reps' => 5, 'notes' => 'PR lift set 2'],
             ['weight' => 120, 'reps' => 5, 'notes' => 'PR lift set 3'],
         ]);
+        $this->triggerPRDetection($secondLiftLog);
 
         // Log third lift at 110 lbs × 5 reps × 3 sets tomorrow (not a PR - less weight and less volume)
         $liftLogData = [
@@ -651,7 +654,7 @@ class LiftLogLoggingTest extends TestCase {
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
         // Should NOT be marked as PR because 120 lbs × 3 sets was already logged
-        $response->assertSessionHas('is_pr', 0);
+        $this->assertEmpty(session('is_pr'));
     }
 
     /** @test */
@@ -694,10 +697,10 @@ class LiftLogLoggingTest extends TestCase {
 
         // Should be marked as PR even though 100 lbs < 300 lbs
         // because they are different exercises
-        $response->assertSessionHas('is_pr', true);
+        $this->assertNotEmpty(session('is_pr'));
         
         $successMessage = session('success');
-        $this->assertStringContainsString('NEW PR!', $successMessage);
+        $this->assertStringContainsString('PR!', $successMessage);
     }
 
     /** @test */
@@ -923,7 +926,7 @@ class LiftLogLoggingTest extends TestCase {
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
         // Should be marked as PR because it's the heaviest 1-rep lift
-        $response->assertSessionHas('is_pr', true);
+        $this->assertNotEmpty(session('is_pr'));
         
         $successMessage = session('success');
         $this->assertStringContainsString('PR!', $successMessage);
@@ -1026,10 +1029,10 @@ class LiftLogLoggingTest extends TestCase {
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
         // Should be marked as PR because it's the heaviest 6-rep lift
-        $response->assertSessionHas('is_pr', true);
+        $this->assertNotEmpty(session('is_pr'));
         
         $successMessage = session('success');
-        $this->assertStringContainsString('NEW PR!', $successMessage);
+        $this->assertStringContainsString('PR!', $successMessage);
 
         // Test that other rep ranges (7-10) also work
         $newPRs = [
@@ -1051,7 +1054,7 @@ class LiftLogLoggingTest extends TestCase {
             ];
 
             $response = $this->post(route('lift-logs.store'), $liftLogData);
-            $response->assertSessionHas('is_pr', true);
+            $this->assertNotEmpty(session('is_pr'));
         }
     }
 

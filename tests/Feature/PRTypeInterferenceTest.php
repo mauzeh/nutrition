@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Enums\PRType;
 use App\Models\Exercise;
 use App\Models\LiftLog;
 use App\Models\User;
@@ -13,9 +12,11 @@ use Tests\TestCase;
  * Tests to ensure different PR types don't interfere with each other
  * and that each type is detected accurately and independently
  */
+use Tests\Helpers\TriggersPRDetection;
+
 class PRTypeInterferenceTest extends TestCase
 {
-    use RefreshDatabase;
+    use RefreshDatabase, TriggersPRDetection;
 
     protected User $user;
 
@@ -38,6 +39,7 @@ class PRTypeInterferenceTest extends TestCase
             'logged_at' => now()->subDay(),
         ]);
         $firstLog->liftSets()->create(['weight' => 100, 'reps' => 5]);
+        $this->triggerPRDetection($firstLog);
 
         // Second session: 80 lbs × 4 reps (lighter weight, but first time doing 4 reps)
         // This IS a PR because it's the first 4-rep attempt - system prioritizes accuracy
@@ -52,13 +54,13 @@ class PRTypeInterferenceTest extends TestCase
 
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
-        $prFlags = session('is_pr');
+        $prTypes = session('is_pr');
         
         // Should be a PR (rep-specific for first 4-rep attempt)
-        $this->assertTrue($prFlags > 0);
+        $this->assertNotEmpty($prTypes);
         
-        // Should have REP_SPECIFIC flag
-        $this->assertTrue(PRType::REP_SPECIFIC->isIn($prFlags));
+        // Should have rep_specific
+        $this->assertContains('rep_specific', $prTypes);
         
         $successMessage = session('success');
         $this->assertStringContainsString('PR!', $successMessage);
@@ -90,14 +92,14 @@ class PRTypeInterferenceTest extends TestCase
 
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
-        $prFlags = session('is_pr');
+        $prTypes = session('is_pr');
         
         // Should be a PR (rep-specific)
-        $this->assertTrue($prFlags > 0);
+        $this->assertNotEmpty($prTypes);
         
-        // Should have REP_SPECIFIC but NOT ONE_RM
-        $this->assertTrue(PRType::REP_SPECIFIC->isIn($prFlags));
-        $this->assertFalse(PRType::ONE_RM->isIn($prFlags));
+        // Should have rep_specific but NOT one_rm
+        $this->assertContains('rep_specific', $prTypes);
+        $this->assertNotContains('one_rm', $prTypes);
     }
 
     /** @test */
@@ -135,15 +137,15 @@ class PRTypeInterferenceTest extends TestCase
 
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
-        $prFlags = session('is_pr');
+        $prTypes = session('is_pr');
         
         // Should be a PR (volume only)
-        $this->assertTrue($prFlags > 0);
+        $this->assertNotEmpty($prTypes);
         
-        // Should have VOLUME but NOT ONE_RM or REP_SPECIFIC
-        $this->assertTrue(PRType::VOLUME->isIn($prFlags));
-        $this->assertFalse(PRType::ONE_RM->isIn($prFlags));
-        $this->assertFalse(PRType::REP_SPECIFIC->isIn($prFlags));
+        // Should have volume but NOT one_rm or rep_specific
+        $this->assertContains('volume', $prTypes);
+        $this->assertNotContains('one_rm', $prTypes);
+        $this->assertNotContains('rep_specific', $prTypes);
     }
 
     /** @test */
@@ -178,29 +180,6 @@ class PRTypeInterferenceTest extends TestCase
         ]);
         $thirdLog->liftSets()->create(['weight' => 155, 'reps' => 9]);
 
-        // Fourth session: 170 lbs × 7 reps (estimated 1RM = 170 × 1.2331 = 209.63 lbs - HIGHER than 203.46)
-        // But NOT a rep-specific PR because 165 lbs × 7 was already done and 170 > 165
-        // Wait, that WOULD be a rep-specific PR...
-        
-        // Let's try: 163 lbs × 7 reps (estimated 1RM = 163 × 1.2331 = 200.99 lbs)
-        // This is LOWER than 203.46, so not a 1RM PR either
-        
-        // Actually, we need: heavier weight at LOWER reps to get higher 1RM without beating the rep-specific
-        // Fourth session: 175 lbs × 6 reps (estimated 1RM = 175 × 1.1998 = 209.97 lbs - HIGHER than 203.46)
-        // First time doing 6 reps, so this IS a rep-specific PR by design
-        
-        // The only way: do a rep count we've done before, with LIGHTER weight, but enough reps to boost 1RM
-        // Fourth session: 160 lbs × 7 reps (estimated 1RM = 160 × 1.2331 = 197.30 lbs)
-        // This is LIGHTER than 165 lbs × 7, so NOT a rep-specific PR
-        // But 197.30 < 203.46, so NOT a 1RM PR either
-        
-        // CONCLUSION: It's mathematically impossible to get 1RM PR without rep-specific PR
-        // because if you increase 1RM, you either:
-        // 1. Do a new rep count (rep-specific PR by design)
-        // 2. Do more weight at existing rep count (rep-specific PR)
-        // 3. Do less weight at existing rep count (usually lower 1RM)
-        
-        // Let's test a realistic scenario: 1RM increases with MULTIPLE PR types
         // Fourth session: 168 lbs × 7 reps (estimated 1RM = 168 × 1.2331 = 207.16 lbs - HIGHER than 203.46)
         $liftLogData = [
             'exercise_id' => $exercise->id,
@@ -213,17 +192,16 @@ class PRTypeInterferenceTest extends TestCase
 
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
-        $prFlags = session('is_pr');
+        $prTypes = session('is_pr');
         
         // Should be a PR (1RM increased from 203.46 to 207.16)
-        $this->assertTrue($prFlags > 0);
+        $this->assertNotEmpty($prTypes);
         
-        // Should have ONE_RM
-        $this->assertTrue(PRType::ONE_RM->isIn($prFlags));
+        // Should have one_rm
+        $this->assertContains('one_rm', $prTypes);
         
-        // Will ALSO have REP_SPECIFIC because 168 > 165 for 7 reps
-        // This is expected and correct - in practice, 1RM PRs usually come with rep-specific PRs
-        $this->assertTrue(PRType::REP_SPECIFIC->isIn($prFlags));
+        // Will ALSO have rep_specific because 168 > 165 for 7 reps
+        $this->assertContains('rep_specific', $prTypes);
     }
 
     /** @test */
@@ -254,15 +232,15 @@ class PRTypeInterferenceTest extends TestCase
 
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
-        $prFlags = session('is_pr');
+        $prTypes = session('is_pr');
         
         // Should be a PR
-        $this->assertTrue($prFlags > 0);
+        $this->assertNotEmpty($prTypes);
         
         // Should have ALL THREE PR types
-        $this->assertTrue(PRType::ONE_RM->isIn($prFlags));
-        $this->assertTrue(PRType::REP_SPECIFIC->isIn($prFlags));
-        $this->assertTrue(PRType::VOLUME->isIn($prFlags));
+        $this->assertContains('one_rm', $prTypes);
+        $this->assertContains('rep_specific', $prTypes);
+        $this->assertContains('volume', $prTypes);
     }
 
     /** @test */
@@ -278,6 +256,7 @@ class PRTypeInterferenceTest extends TestCase
             'logged_at' => now()->subDay(),
         ]);
         $firstLog->liftSets()->create(['weight' => 100, 'reps' => 15]);
+        $this->triggerPRDetection($firstLog);
 
         // Second session: 110 lbs × 15 reps × 1 set = 1650 lbs volume
         // Higher weight and volume
@@ -294,15 +273,15 @@ class PRTypeInterferenceTest extends TestCase
 
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
-        $prFlags = session('is_pr');
+        $prTypes = session('is_pr');
         
         // Should be a PR
-        $this->assertTrue($prFlags > 0);
+        $this->assertNotEmpty($prTypes);
         
-        // Should have VOLUME and ONE_RM (capped at 10 reps), but NOT REP_SPECIFIC (because 15 reps > 10)
-        $this->assertTrue(PRType::VOLUME->isIn($prFlags));
-        $this->assertTrue(PRType::ONE_RM->isIn($prFlags)); // Now calculated with cap
-        $this->assertFalse(PRType::REP_SPECIFIC->isIn($prFlags)); // Still not tracked for >10 reps
+        // Should have volume and one_rm (capped at 10 reps), but NOT rep_specific (because 15 reps > 10)
+        $this->assertContains('volume', $prTypes);
+        $this->assertContains('one_rm', $prTypes); // Now calculated with cap
+        $this->assertNotContains('rep_specific', $prTypes); // Still not tracked for >10 reps
     }
 
     /** @test */
@@ -337,13 +316,13 @@ class PRTypeInterferenceTest extends TestCase
 
         // Use the service directly to check
         $prService = app(\App\Services\PRDetectionService::class);
-        $prFlags = $prService->isLiftLogPR($secondLog, $exercise, $this->user);
+        $prTypes = $prService->isLiftLogPR($secondLog, $exercise, $this->user);
         
         // Should be a PR (volume and possibly others)
-        $this->assertTrue($prFlags > 0);
+        $this->assertNotEmpty($prTypes);
         
-        // Should have VOLUME PR
-        $this->assertTrue(PRType::VOLUME->isIn($prFlags));
+        // Should have volume PR
+        $this->assertContains('volume', $prTypes);
     }
 
     /** @test */
@@ -388,13 +367,10 @@ class PRTypeInterferenceTest extends TestCase
 
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
-        $prFlags = session('is_pr');
+        $prTypes = session('is_pr');
         
         // Should NOT be a PR
-        $this->assertEquals(0, $prFlags);
-        $this->assertFalse(PRType::ONE_RM->isIn($prFlags));
-        $this->assertFalse(PRType::REP_SPECIFIC->isIn($prFlags));
-        $this->assertFalse(PRType::VOLUME->isIn($prFlags));
+        $this->assertEmpty($prTypes);
     }
 
     /** @test */
@@ -428,9 +404,10 @@ class PRTypeInterferenceTest extends TestCase
 
         $response = $this->post(route('lift-logs.store'), $liftLogData);
 
-        $prFlags = session('is_pr');
+        $prTypes = session('is_pr');
         
         // Should NOT be a PR (within 1% tolerance)
-        $this->assertEquals(0, $prFlags);
+        $this->assertEmpty($prTypes);
     }
 }
+
