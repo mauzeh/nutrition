@@ -158,8 +158,32 @@ bucket's record.
 - Do NOT change static_hold behavior / 300s cap.
 
 ## Post-Execution Retro (filled after completion; reviewer authors)
-- **Attempts:** {1 (clean) / N + root cause}
-- **Migration test:** {what it seeds + asserts}
-- **PRType labels:** {added / documented-unused}
-- **Tests added:** {count}
-- **Prompt improvements for next time:** {…}
+- **Attempts:** 2. Attempt 1 (this prompt) shipped the migration fixes and passed the migration test on
+  in-memory SQLite, but a real defect survived: the executor kept a blanket `DELETE FROM personal_records
+  WHERE pr_type IN (sled_*)` and relied on the recompute's Eloquent `->delete()` to clear the rest. Attempt
+  2 (fix commit `45bf2303`) was forced when the migration was actually RUN against the MySQL dev DB during
+  manual verification and threw an FK integrity violation, then (once the blanket delete was removed) left
+  soft-deleted rows behind.
+- **Migration test:** original seeds a sled exercise + carry exercise + logs + a legacy `sled_weight` PR,
+  runs migration B, asserts exercise_type→load_output, log_type preserved, sled_* count 0, static-hold
+  untouched, mapFromColumns non-empty. **Added in attempt 2:** a second case seeding two legacy sled_* rows
+  where one references the other via `previous_pr_id` (reproduces the self-FK) — asserts the migration does
+  not throw and leaves zero sled_* rows (catches both the FK and soft-delete traps the SQLite happy-path missed).
+- **PRType labels:** added (LOAD/DISTANCE/DURATION/SPEED getLabel arms + getBestLabel priority).
+- **Tests added:** 1 (the self-referential/soft-delete migration regression case), on top of the original.
+- **Prompt improvements for next time:**
+  1. **A migration is not verified until it has RUN against a real (MySQL) DB, not just the in-memory SQLite
+     test.** The SQLite migration test passed while the migration was broken on MySQL. Prompts that add a
+     data migration must include a "run `php artisan migrate` against the dev DB and confirm `migrate:status`
+     = Ran" step, not only a `RefreshDatabase` feature test.
+  2. **Never bulk-`DELETE` rows on a table with a self-referential FK** (`personal_records.previous_pr_id`,
+     `NO ACTION`) — null inbound references first, or delete the whole connected set together.
+  3. **`PersonalRecord` uses SoftDeletes** — an Eloquent `->delete()` (as in `PRRecalculationService`) does
+     NOT physically remove rows; a migration that must eliminate rows by pr_type has to hard-delete via the
+     query builder (which also bypasses the soft-delete scope). Raw `DB::table()->count()` sees soft-deleted
+     rows, so an assert built on it will trip on them.
+  4. The blanket delete I flagged in the follow-up-2 review as "redundant but safe" was in fact the source
+     of the FK violation — trust the "why is this here?" review instinct and remove genuinely redundant
+     data operations rather than leaving them as belt-and-suspenders.
+- **Steering updates needed:** yes — see the two additions made to `logger/.kiro/steering/conventions.md`
+  (migration safety: SoftDeletes + self-FK deletes) and the run-it rule woven into the master plan (rev 18).

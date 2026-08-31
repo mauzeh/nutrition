@@ -140,6 +140,12 @@ When antigravity finishes and the user brings the code back:
 - Run `php artisan test --parallel`.
 - Confirm `AGY_COMPLETE` was printed (or identify why not).
 - Confirm no git commits were made by the executor and no Pint was run.
+- **If the change includes a migration: RUN it and confirm it took.** Run `php artisan migrate`, then
+  `php artisan migrate:status` to confirm the new migration is **Ran**, and verify the intended data end
+  state (e.g. row counts, re-typed columns). A green `RefreshDatabase` feature test proves the migration
+  works on in-memory SQLite — it does NOT prove it ran, and it does NOT catch MySQL-only failures
+  (self-referential FK integrity, SoftDeletes leaving rows behind). Data migrations must be exercised
+  against the real DB before the feature is considered verified.
 
 ### 2. Review holistically
 - Read the diff as a behavioral narrative (what changed, not file-by-file).
