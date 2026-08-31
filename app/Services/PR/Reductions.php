@@ -191,6 +191,20 @@ final class Reductions
         return $grouped;
     }
 
+    /**
+     * Normalize a distance to integer meters (parity with the Athlete engine and the
+     * former LoadOutput strategy). Feet convert via 0.3048; meters round to integer.
+     * This is what makes distance/speed PRs comparable across mixed distance_units.
+     */
+    private static function normalizeDistance(float $distance, string $unit): int
+    {
+        if ($distance <= 0) {
+            return 0;
+        }
+        $meters = strtolower($unit) === 'ft' ? $distance * 0.3048 : $distance;
+        return (int) round($meters);
+    }
+
     private static function extractValue(mixed $set, string $field): float|int|null
     {
         if (is_array($set)) {
@@ -201,9 +215,11 @@ final class Reductions
             if ($val === null && $field === 'reps') {
                 $val = $set['rounds'] ?? null;
             }
-            $unit = $set['unit'] ?? 'lbs';
-            if ($field === 'weight' && $val !== null && strtolower((string)$unit) === 'kg') {
+            if ($field === 'weight' && $val !== null && strtolower((string)($set['unit'] ?? 'lbs')) === 'kg') {
                 $val = round((float)$val * 2.2046226218, 2);
+            }
+            if ($field === 'distance' && $val !== null) {
+                $val = self::normalizeDistance((float)$val, (string)($set['distance_unit'] ?? 'm'));
             }
             return $val;
         }
@@ -216,9 +232,11 @@ final class Reductions
             if ($val === null && $field === 'reps') {
                 $val = $set->rounds ?? null;
             }
-            $unit = $set->unit ?? 'lbs';
-            if ($field === 'weight' && $val !== null && strtolower((string)$unit) === 'kg') {
+            if ($field === 'weight' && $val !== null && strtolower((string)($set->unit ?? 'lbs')) === 'kg') {
                 $val = round((float)$val * 2.2046226218, 2);
+            }
+            if ($field === 'distance' && $val !== null) {
+                $val = self::normalizeDistance((float)$val, (string)($set->distance_unit ?? 'm'));
             }
             return $val;
         }

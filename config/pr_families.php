@@ -225,6 +225,7 @@ return [
                 'valueField' => 'duration',
                 'direction' => 'min',
                 'tolerance' => 'none',
+                'requirePrevious' => true,
                 'store' => 'keyedByKey',
                 'label' => 'Fastest Time',
                 'format' => 'seconds',

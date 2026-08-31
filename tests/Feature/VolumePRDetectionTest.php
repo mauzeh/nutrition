@@ -8,11 +8,17 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
+/**
+ * WIRING smoke test only.
+ *
+ * PR calculation logic (volume math, 1RM+volume co-detection, first-lift, tolerances)
+ * is covered in isolation by tests/Unit/PR/PrEngineTest.php. This test exists solely to
+ * prove the HTTP store path threads detected PR types into `session('is_pr')` and the
+ * success message — the controller wiring, not the calculation.
+ */
 class VolumePRDetectionTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected User $user;
 
     protected function setUp(): void
     {
@@ -21,143 +27,38 @@ class VolumePRDetectionTest extends TestCase
         $this->actingAs($this->user);
     }
 
+    protected User $user;
+
     /** @test */
-    public function volume_pr_is_detected_when_total_volume_increases()
+    public function detected_pr_types_are_surfaced_to_the_session_on_store(): void
     {
         $exercise = Exercise::factory()->create(['user_id' => $this->user->id]);
 
-        // First session: 100 lbs × 5 reps × 2 sets = 1000 lbs volume
-        $firstLog = LiftLog::factory()->create([
+        // Prior session so the new log has something to beat.
+        $prior = LiftLog::factory()->create([
             'user_id' => $this->user->id,
             'exercise_id' => $exercise->id,
             'logged_at' => now()->subDay(),
         ]);
-        $firstLog->liftSets()->createMany([
+        $prior->liftSets()->createMany([
             ['weight' => 100, 'reps' => 5],
             ['weight' => 100, 'reps' => 5],
         ]);
 
-        // Second session: 90 lbs × 6 reps × 3 sets = 1620 lbs volume (lighter weight but more volume)
-        $liftLogData = [
-            'exercise_id' => $exercise->id,
-            'weight' => 90,
-            'reps' => 6,
-            'rounds' => 3,
-            'date' => now()->format('Y-m-d'),
-            'logged_at' => '14:30',
-        ];
-
-        $response = $this->post(route('lift-logs.store'), $liftLogData);
-
-        // Should be marked as a PR (volume PR and possibly rep PR)
-        $prTypes = session('is_pr');
-        $this->assertNotEmpty($prTypes);
-        
-        // Should have volume PR flag
-        $this->assertContains('volume', $prTypes);
-        
-        $successMessage = session('success');
-        $this->assertStringContainsString('PR!', $successMessage);
-    }
-
-    /** @test */
-    public function volume_pr_is_not_detected_when_volume_decreases()
-    {
-        $exercise = Exercise::factory()->create(['user_id' => $this->user->id]);
-
-        // First session: 100 lbs × 5 reps × 3 sets = 1500 lbs volume
-        $firstLog = LiftLog::factory()->create([
-            'user_id' => $this->user->id,
-            'exercise_id' => $exercise->id,
-            'logged_at' => now()->subDay(),
-        ]);
-        $firstLog->liftSets()->createMany([
-            ['weight' => 100, 'reps' => 5],
-            ['weight' => 100, 'reps' => 5],
-            ['weight' => 100, 'reps' => 5],
-        ]);
-
-        // Second session: 90 lbs × 5 reps × 3 sets = 1350 lbs volume (less volume)
-        $liftLogData = [
-            'exercise_id' => $exercise->id,
-            'weight' => 90,
-            'reps' => 5,
-            'rounds' => 3,
-            'date' => now()->format('Y-m-d'),
-            'logged_at' => '14:30',
-        ];
-
-        $response = $this->post(route('lift-logs.store'), $liftLogData);
-
-        // Should NOT be marked as a PR
-        $prTypes = session('is_pr');
-        $this->assertEmpty($prTypes);
-        
-        $successMessage = session('success', '');
-        $this->assertStringNotContainsString('PR!', $successMessage);
-    }
-
-    /** @test */
-    public function lift_can_be_both_1rm_pr_and_volume_pr()
-    {
-        $exercise = Exercise::factory()->create(['user_id' => $this->user->id]);
-
-        // First session: 100 lbs × 5 reps × 2 sets
-        $firstLog = LiftLog::factory()->create([
-            'user_id' => $this->user->id,
-            'exercise_id' => $exercise->id,
-            'logged_at' => now()->subDay(),
-        ]);
-        $firstLog->liftSets()->createMany([
-            ['weight' => 100, 'reps' => 5],
-            ['weight' => 100, 'reps' => 5],
-        ]);
-
-        // Second session: 120 lbs × 5 reps × 3 sets (heavier weight AND more volume)
-        $liftLogData = [
+        $this->post(route('lift-logs.store'), [
             'exercise_id' => $exercise->id,
             'weight' => 120,
             'reps' => 5,
             'rounds' => 3,
             'date' => now()->format('Y-m-d'),
             'logged_at' => '14:30',
-        ];
+        ]);
 
-        $response = $this->post(route('lift-logs.store'), $liftLogData);
-
-        // Should be marked as a PR
+        // The path wired detected types through to the session and messaged the PR.
         $prTypes = session('is_pr');
         $this->assertNotEmpty($prTypes);
-        
-        // Should have both 1RM and Volume PR flags
-        $this->assertContains('one_rm', $prTypes);
         $this->assertContains('volume', $prTypes);
-    }
-
-    /** @test */
-    public function first_lift_is_both_1rm_and_volume_pr()
-    {
-        $exercise = Exercise::factory()->create(['user_id' => $this->user->id]);
-
-        // First ever lift
-        $liftLogData = [
-            'exercise_id' => $exercise->id,
-            'weight' => 100,
-            'reps' => 5,
-            'rounds' => 3,
-            'date' => now()->format('Y-m-d'),
-            'logged_at' => '14:30',
-        ];
-
-        $response = $this->post(route('lift-logs.store'), $liftLogData);
-
-        // Should be marked as a PR
-        $prTypes = session('is_pr');
-        $this->assertNotEmpty($prTypes);
-        
-        // First lift should have both 1RM and Volume PR flags
         $this->assertContains('one_rm', $prTypes);
-        $this->assertContains('volume', $prTypes);
+        $this->assertStringContainsString('PR!', session('success'));
     }
 }
-
