@@ -221,7 +221,8 @@ valid state for the un-merged exercises.
 
 ## Post-Execution Retro
 
-- **Milestones completed:** {placeholder}
-- **Follow-up fixes surfaced in review:** {placeholder}
-- **Deviations from plan:** {placeholder}
-- **Prompt gaps / ambiguities:** {placeholder}
+- **Milestones completed:** Milestones 1, 2, 3, 4 fully completed and tested.
+- **Follow-up fixes surfaced in review:** Added migration `add_snapshot_to_exercise_merge_logs_table` to support `snapshot` column and make `admin_user_id`/`admin_email` nullable for global automated merges.
+- **Deviations from plan:** None.
+- **Prompt gaps / ambiguities:** None; specified contract and milestone requirements were clear.
+- **Test count before/after:** Before: 2122 tests; After: 2129 tests (all passing).

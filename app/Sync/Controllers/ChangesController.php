@@ -11,6 +11,7 @@ class ChangesController
 {
     public function __construct(
         private SetFieldMapper $setFieldMapper,
+        private \App\Sync\Services\RehydrationService $rehydrationService,
     ) {}
 
     /**
@@ -95,12 +96,22 @@ class ChangesController
             ->pluck('id')
             ->toArray();
 
-        return response()->json([
+        $payload = [
             'status' => 'ok',
             'logs' => $logsData,
             'deleted_ids' => $deletedLogs,
             'userExercises' => $this->getUserExercises($user),
-        ]);
+        ];
+
+        $token = $this->rehydrationService->latestToken($user);
+        if ($token !== null) {
+            $payload['rehydrate'] = [
+                'token' => $token,
+                'reason' => $this->rehydrationService->latestReason($user) ?? 'exercise-merge',
+            ];
+        }
+
+        return response()->json($payload);
     }
 
     /**

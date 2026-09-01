@@ -316,4 +316,149 @@ class ExerciseMergeService
             'users_count' => $exercise->liftLogs()->distinct('user_id')->count('user_id'),
         ];
     }
+
+    /**
+     * Perform a map-driven exercise merge across global exercises.
+     *
+     * @param array{target: string, title: string, sources: array<int, string>} $merge
+     * @return array<int, int> Affected user IDs
+     */
+    public function mergeByMap(array $merge): array
+    {
+        $targetIdentifier = $merge['target'];
+        $targetTitle = $merge['title'];
+        $sourceIdentifiers = $merge['sources'];
+
+        // Resolve target global exercise
+        $target = $this->resolveGlobalExercise($targetIdentifier, $targetTitle);
+        if (! $target) {
+            throw new \RuntimeException("Target exercise [{$targetIdentifier} / {$targetTitle}] not found.");
+        }
+
+        // Resolve source global exercises
+        $sources = [];
+        foreach ($sourceIdentifiers as $sourceId) {
+            $source = $this->resolveGlobalExercise($sourceId, $sourceId);
+            if ($source) {
+                if ($source->id === $target->id) {
+                    continue;
+                }
+                $sources[$source->id] = $source;
+            }
+        }
+
+        if (empty($sources)) {
+            // Idempotent: all sources already merged / deleted / absent
+            return [];
+        }
+
+        $affectedUserIds = [];
+
+        DB::transaction(function () use ($merge, $target, $sources, &$affectedUserIds) {
+            $targetOriginalCanonical = $target->canonical_name;
+            $targetOriginalTitle = $target->title;
+
+            foreach ($sources as $source) {
+                // Collect lift log IDs and affected user IDs
+                $liftLogs = LiftLog::where('exercise_id', $source->id)->get();
+                $liftLogIds = $liftLogs->pluck('id')->all();
+                foreach ($liftLogs as $log) {
+                    if ($log->user_id) {
+                        $affectedUserIds[$log->user_id] = $log->user_id;
+                    }
+                }
+
+                // Repoint lift logs
+                LiftLog::where('exercise_id', $source->id)->update(['exercise_id' => $target->id]);
+
+                // Handle exercise intelligence
+                $this->handleExerciseIntelligence($source, $target);
+
+                // Create global alias for source canonical_name and title on target
+                $aliasesCreated = [];
+                $aliasesToCreate = array_filter(array_unique([$source->canonical_name, $source->title]));
+                foreach ($aliasesToCreate as $aliasName) {
+                    $exists = \App\Models\ExerciseAlias::query()
+                        ->where('exercise_id', $target->id)
+                        ->where('alias_name', $aliasName)
+                        ->whereNull('user_id')
+                        ->exists();
+
+                    if (! $exists) {
+                        $aliasModel = \App\Models\ExerciseAlias::create([
+                            'user_id' => null,
+                            'exercise_id' => $target->id,
+                            'alias_name' => $aliasName,
+                        ]);
+                        $aliasesCreated[] = $aliasModel->id;
+                    }
+                }
+
+                // Create audit log
+                ExerciseMergeLog::create([
+                    'source_exercise_id' => $source->id,
+                    'source_exercise_title' => $source->title,
+                    'target_exercise_id' => $target->id,
+                    'target_exercise_title' => $target->title,
+                    'admin_user_id' => null,
+                    'admin_email' => null,
+                    'lift_log_ids' => $liftLogIds,
+                    'lift_log_count' => count($liftLogIds),
+                    'alias_created' => ! empty($aliasesCreated),
+                    'snapshot' => [
+                        'source' => [
+                            'id' => $source->id,
+                            'canonical_name' => $source->canonical_name,
+                            'title' => $source->title,
+                            'log_type' => $source->log_type,
+                            'exercise_type' => $source->exercise_type,
+                        ],
+                        'target_original' => [
+                            'id' => $target->id,
+                            'canonical_name' => $targetOriginalCanonical,
+                            'title' => $targetOriginalTitle,
+                        ],
+                        'aliases_created' => $aliasesCreated,
+                    ],
+                ]);
+
+                // Soft-delete source exercise
+                $source->delete();
+            }
+
+            // Set target canonical name and title per map (naming authority)
+            $target->update([
+                'canonical_name' => $merge['target'],
+                'title' => $merge['title'],
+            ]);
+        });
+
+        return array_values($affectedUserIds);
+    }
+
+    /**
+     * Resolve a global exercise by canonical_name, then by title (case-insensitive).
+     */
+    private function resolveGlobalExercise(string $identifier, string $fallbackTitle): ?Exercise
+    {
+        $query = Exercise::whereNull('user_id')->whereNull('deleted_at');
+
+        $matches = (clone $query)->where('canonical_name', $identifier)->get();
+
+        if ($matches->count() > 1) {
+            throw new \RuntimeException("Ambiguous resolution for global exercise canonical_name [{$identifier}]: multiple rows found.");
+        }
+
+        if ($matches->count() === 1) {
+            return $matches->first();
+        }
+
+        $titleMatches = (clone $query)->whereRaw('LOWER(title) = ?', [mb_strtolower($fallbackTitle)])->get();
+
+        if ($titleMatches->count() > 1) {
+            throw new \RuntimeException("Ambiguous resolution for global exercise title [{$fallbackTitle}]: multiple rows found.");
+        }
+
+        return $titleMatches->first();
+    }
 }

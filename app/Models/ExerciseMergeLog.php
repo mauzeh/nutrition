@@ -31,12 +31,14 @@ class ExerciseMergeLog extends Model
         'lift_log_ids',
         'lift_log_count',
         'alias_created',
+        'snapshot',
     ];
 
     protected $casts = [
         'lift_log_ids' => 'array',
         'lift_log_count' => 'integer',
         'alias_created' => 'boolean',
+        'snapshot' => 'array',
     ];
 
     /**
