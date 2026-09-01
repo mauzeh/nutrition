@@ -125,8 +125,19 @@ class PRDetectionService
 
     public function detectPRsWithDetails(LiftLog $liftLog): array
     {
-        $exercise = $liftLog->exercise;
-        $user = $liftLog->user;
+        // Resolve the exercise even if it's soft-deleted — the log still belongs to it and its
+        // log_type/exercise_type drive family resolution. Without withTrashed(), a soft-deleted
+        // exercise (or user) makes the relation null and reading ->id/->log_type throws.
+        $exercise = $liftLog->exercise ?? $liftLog->exercise()->withTrashed()->first();
+
+        // A log with no resolvable exercise can't be scored — return no PRs (recalc then clears any
+        // stale rows for the pair). Use the log's own foreign keys for scoping, which are always
+        // present regardless of whether the parent user/exercise is soft-deleted.
+        if (!$exercise) {
+            return [];
+        }
+
+        $userId = $liftLog->user_id;
         $family = $this->prEngine->resolveFamily($exercise->log_type, $exercise->exercise_type);
 
         if (!$family) {
@@ -134,7 +145,7 @@ class PRDetectionService
         }
 
         $previousLogs = LiftLog::where('exercise_id', $exercise->id)
-            ->where('user_id', $user->id)
+            ->where('user_id', $userId)
             ->where(function ($q) use ($liftLog) {
                 $q->where('logged_at', '<', $liftLog->logged_at)
                   ->orWhere(function ($q2) use ($liftLog) {
@@ -197,7 +208,7 @@ class PRDetectionService
 
             // Enrich previous_pr_id if a previous record existed
             if ($pr['previous_value'] !== null) {
-                $prevPrQuery = PersonalRecord::where('user_id', $user->id)
+                $prevPrQuery = PersonalRecord::where('user_id', $userId)
                     ->where('exercise_id', $exercise->id)
                     ->where('pr_type', $pr['type']);
 

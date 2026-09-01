@@ -165,7 +165,7 @@ class CalculateHistoricalPRsCommandTest extends TestCase
     public function it_handles_empty_database_gracefully()
     {
         $this->artisan('prs:calculate-historical --force')
-            ->expectsOutput('No lift logs found to process.')
+            ->expectsOutput('No lift logs or personal records found to process.')
             ->assertExitCode(1);
     }
 }

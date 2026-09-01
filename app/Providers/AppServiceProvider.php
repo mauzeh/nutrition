@@ -85,11 +85,11 @@ class AppServiceProvider extends ServiceProvider
         PRComment::observe(PRCommentObserver::class);
         PRHighFive::observe(PRHighFiveObserver::class);
 
-        // Register event listeners
-        \Illuminate\Support\Facades\Event::listen(
-            \App\Events\LiftLogCompleted::class,
-            \App\Listeners\DetectAndRecordPRs::class
-        );
+        // Event listeners are wired via Laravel 11 automatic event discovery
+        // (App\Listeners\DetectAndRecordPRs::handle type-hints LiftLogCompleted).
+        // Do NOT also register it explicitly here — a second Event::listen made the
+        // listener fire twice, writing duplicate PersonalRecord rows per PR (the
+        // duplicated "Records beaten" table rows).
 
         // Enable query log for non-production environments
         // 2025-11-09 Temporarily enabled across all environments to troubleshoot discrepancy

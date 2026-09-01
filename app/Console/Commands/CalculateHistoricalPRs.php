@@ -46,24 +46,38 @@ class CalculateHistoricalPRs extends Command
         $dryRun = $this->option('dry-run');
         $force = $this->option('force');
 
-        // Build query for user-exercise combinations
-        $query = LiftLog::query()
+        // Build query for user-exercise combinations.
+        $logQuery = LiftLog::query()
+            ->select('user_id', 'exercise_id')
+            ->distinct();
+
+        // Also include pairs that have PersonalRecord rows but NO (active) lift logs. When every log
+        // for an exercise has been deleted, its PRs are orphaned — recalculateAllPRsForExercise()
+        // deletes-then-rebuilds, so recalcing a log-less pair produces zero PRs and clears the
+        // orphans. Sourcing combinations only from lift_logs used to skip these pairs entirely,
+        // leaving stale (and sometimes duplicated) "current" PRs behind. Recalc now auto-cleans them.
+        $prQuery = \App\Models\PersonalRecord::query()
             ->select('user_id', 'exercise_id')
             ->distinct();
 
         if ($userId) {
-            $query->where('user_id', $userId);
+            $logQuery->where('user_id', $userId);
+            $prQuery->where('user_id', $userId);
         }
 
         if ($exerciseId) {
-            $query->where('exercise_id', $exerciseId);
+            $logQuery->where('exercise_id', $exerciseId);
+            $prQuery->where('exercise_id', $exerciseId);
         }
 
-        $combinations = $query->get();
+        $combinations = $logQuery->get()
+            ->concat($prQuery->get())
+            ->unique(fn ($c) => $c->user_id . '|' . $c->exercise_id)
+            ->values();
         $totalCombinations = $combinations->count();
 
         if ($totalCombinations === 0) {
-            $this->error('No lift logs found to process.');
+            $this->error('No lift logs or personal records found to process.');
             return 1;
         }
 
@@ -73,16 +87,20 @@ class CalculateHistoricalPRs extends Command
         $this->newLine();
         
         if ($userId) {
-            $user = User::find($userId);
-            $this->info("User: {$user->name} (ID: {$userId})");
+            // withTrashed so a soft-deleted user (whose logs/PRs may still need recalc + cleanup)
+            // doesn't crash the summary display.
+            $user = User::withTrashed()->find($userId);
+            $label = $user ? $user->name : 'unknown';
+            $this->info("User: {$label} (ID: {$userId})");
         } else {
             $userCount = User::whereHas('liftLogs')->count();
             $this->info("Users: {$userCount}");
         }
 
         if ($exerciseId) {
-            $exercise = Exercise::find($exerciseId);
-            $this->info("Exercise: {$exercise->title} (ID: {$exerciseId})");
+            $exercise = Exercise::withTrashed()->find($exerciseId);
+            $label = $exercise ? $exercise->title : 'unknown';
+            $this->info("Exercise: {$label} (ID: {$exerciseId})");
         } else {
             $exerciseCount = Exercise::whereHas('liftLogs')->count();
             $this->info("Exercises: {$exerciseCount}");
