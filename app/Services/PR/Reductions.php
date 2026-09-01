@@ -96,7 +96,7 @@ final class Reductions
                     break;
                 }
                 // If pure bodyweight log (all zero weight), treat zero weight factor as 1
-                if ($allZeroWeight && $factor === 'weight' && $val == 0) {
+                if ($allZeroWeight && self::resolveField($factor) === 'weight' && $val == 0) {
                     $val = 1;
                 }
                 $product *= $val;
@@ -160,7 +160,7 @@ final class Reductions
                 // buildCompositeKey (Math.round(toComparable(...))). extractValue yields the
                 // 2-decimal kg→lbs value; without this round a kg log would bucket as
                 // "220.46|50" while Athlete buckets "220|50", silently diverging speed PRs.
-                if ($kf === 'weight') {
+                if (self::resolveField($kf) === 'weight') {
                     $kVal = (int) round((float) $kVal);
                 }
                 $keyParts[] = (string) $kVal;
@@ -239,8 +239,16 @@ final class Reductions
         return self::extractValue($set, $field, roundMass: false);
     }
 
+    // The only role token is 'load' → the weight column. Logger has no dialect: all mass lives in `weight`.
+    private static function resolveField(string $field): string
+    {
+        return $field === 'load' ? 'weight' : $field;
+    }
+
     private static function extractValue(mixed $set, string $field, bool $roundMass = true): float|int|null
     {
+        $field = self::resolveField($field);
+
         $convertMass = function ($val) use ($roundMass) {
             $lbs = (float) $val * 2.2046226218;
             return $roundMass ? round($lbs, 2) : $lbs;

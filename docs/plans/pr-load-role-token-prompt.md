@@ -176,7 +176,7 @@ AGY_COMPLETE: All milestones passed.
 - Do NOT add a migration or change how sets are stored.
 
 ## Post-Execution Retro (added after completion)
-- **Attempts:** {1 (clean) / N — root cause}
-- **Tests added:** {count}
-- **Prompt improvements for next time:** {what to add/change}
-- **Steering updates needed:** {yes/no, what}
+- **Attempts:** 1 (clean)
+- **Tests added:** 2
+- **Prompt improvements for next time:** None — prompt plan was clear and exact.
+- **Steering updates needed:** no

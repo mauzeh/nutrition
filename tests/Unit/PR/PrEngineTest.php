@@ -90,13 +90,31 @@ class PrEngineTest extends TestCase
 
     public function test_per_key_min_value_composite_key_for_speed(): void
     {
-        // speed: min duration at a (weight|distance) bucket.
+        // speed: min duration at a (load|distance) bucket.
         $sets = [
             ['weight' => 100, 'distance' => 50, 'duration' => 60],
             ['weight' => 100, 'distance' => 50, 'duration' => 45],
         ];
-        $desc = ['keyFields' => ['weight', 'distance'], 'aggregate' => 'minValue', 'valueField' => 'duration'];
+        $desc = ['keyFields' => ['load', 'distance'], 'aggregate' => 'minValue', 'valueField' => 'duration'];
         $this->assertEquals(['100|50' => 45], Reductions::perKey($sets, $desc));
+    }
+
+    public function test_load_role_token_resolves_to_weight_column_for_kg_conversion(): void
+    {
+        // 100 kg -> 220.46 lbs when descriptor field is 'load'
+        $sets = [['weight' => 100, 'unit' => 'kg', 'reps' => 1]];
+        $this->assertEqualsWithDelta(220.46, Reductions::maxOf($sets, 'load'), 0.01);
+    }
+
+    public function test_load_role_token_speed_bucket_rounds_mass_to_whole_pound(): void
+    {
+        // speed descriptor with keyFields ['load', 'distance'] and 100 kg input (220.46 lbs) => bucket '220|50'
+        $sets = [
+            ['weight' => 100, 'unit' => 'kg', 'distance' => 50, 'duration' => 60],
+            ['weight' => 100, 'unit' => 'kg', 'distance' => 50, 'duration' => 45],
+        ];
+        $desc = ['keyFields' => ['load', 'distance'], 'aggregate' => 'minValue', 'valueField' => 'duration'];
+        $this->assertEquals(['220|50' => 45], Reductions::perKey($sets, $desc));
     }
 
     // ─── Unit normalization (absorbs UnitConversionInPRDetectionTest) ────────────
