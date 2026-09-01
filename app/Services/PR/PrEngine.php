@@ -44,8 +44,18 @@ final class PrEngine
     /**
      * Detect PRs by comparing current metrics against history.
      *
+     * STRUCTURAL MIRROR of the Athlete engine's detectMeasurementPRs
+     * (athlete/src/shared/logging/pr/measurementPREngine.js): one loop over the family's
+     * descriptors → dispatch on `compare` (scalarBest | keyedBest) → `isPR ? push : reason`.
+     * Both engines receive `$history` already in the common comparable shape (scalar type → a
+     * bare number|null; keyed type → { key => number }). The engines differ only in HOW that
+     * shape is produced upstream — Logger derives it from prior logs
+     * (PRDetectionService::buildHistoryFromPreviousLogs); Athlete adapts its persisted prHistory
+     * blob (normalizeHistory). That difference is the documented, legitimate storage-model split;
+     * the loop below is identical to Athlete's.
+     *
      * @param array $metrics Metrics computed by computeMetrics
-     * @param array $history History of bests per type
+     * @param array $history Comparable bests per type
      * @param string $family PR family name
      * @return array { prs: array, reasons: array }
      */

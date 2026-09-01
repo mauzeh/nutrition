@@ -86,16 +86,9 @@ final class Comparators
                 continue;
             }
 
+            // Keys are integers on both engines (rep counts; weight/time buckets are whole units),
+            // so an exact key lookup is sufficient — mirror of the Athlete keyedBest.
             $bestVal = $bestHistory[$key] ?? null;
-            if ($bestVal === null && $toleranceType === 'unit' && is_numeric($key)) {
-                $targetKeyFloat = (float)$key;
-                foreach ($bestHistory as $hKey => $hVal) {
-                    if (is_numeric($hKey) && abs((float)$hKey - $targetKeyFloat) <= 0.5) {
-                        $bestVal = $hVal;
-                        break;
-                    }
-                }
-            }
             $requirePrevious = $descriptor['requirePrevious'] ?? false;
 
             if ($bestVal === null) {
@@ -136,8 +129,9 @@ final class Comparators
      */
     private static function applyDominatedSuppression(array $results, array $currentMetrics, array $bestHistory, array $descriptor): array
     {
-        $direction = $descriptor['direction'] ?? 'max';
-        $toleranceType = $descriptor['tolerance'] ?? 'none';
+        // Tolerance-aware: a higher rep count dominates when it holds >= (thisWeight - tol) — mirror
+        // of the Athlete applyDominatedSuppression (a within-tolerance heavier-for-more-reps set wins).
+        $tol = self::resolveTolerance($descriptor['tolerance'] ?? 'none', 0);
 
         foreach ($results as $key => $res) {
             if (!$res['isPR']) {
@@ -147,11 +141,9 @@ final class Comparators
             $repCount = (int)$key;
             $currentWeight = $res['current'];
 
-            // Check if any higher rep count in current metrics or history beats/matches this weight
             // 1. Check current metrics higher reps
             foreach ($currentMetrics as $otherKey => $otherWeight) {
-                $otherReps = (int)$otherKey;
-                if ($otherReps > $repCount && $otherWeight >= $currentWeight) {
+                if ((int)$otherKey > $repCount && $otherWeight >= $currentWeight - $tol) {
                     $results[$key]['isPR'] = false;
                     break;
                 }
@@ -163,8 +155,7 @@ final class Comparators
 
             // 2. Check stored history higher reps
             foreach ($bestHistory as $otherKey => $otherWeight) {
-                $otherReps = (int)$otherKey;
-                if ($otherReps > $repCount && $otherWeight >= $currentWeight) {
+                if ((int)$otherKey > $repCount && $otherWeight >= $currentWeight - $tol) {
                     $results[$key]['isPR'] = false;
                     break;
                 }
