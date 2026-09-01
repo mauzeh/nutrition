@@ -104,7 +104,7 @@ class PRRecordsComponentAssembler
         }
         
         $prEngine = app(\App\Services\PR\PrEngine::class);
-        $family = $prEngine->resolveFamily($liftLog->exercise->log_type ?? 'regular');
+        $family = $prEngine->resolveFamily($liftLog->exercise->log_type ?? null, $liftLog->exercise->exercise_type ?? null);
         $descriptors = config("pr_families.families.{$family}", []);
         $descriptorMap = array_column($descriptors, null, 'type');
 
@@ -155,7 +155,7 @@ class PRRecordsComponentAssembler
         }
         
         $prEngine = app(\App\Services\PR\PrEngine::class);
-        $family = $prEngine->resolveFamily($liftLog->exercise->log_type ?? 'regular');
+        $family = $prEngine->resolveFamily($liftLog->exercise->log_type ?? null, $liftLog->exercise->exercise_type ?? null);
         $descriptors = config("pr_families.families.{$family}", []);
         $descriptorMap = array_column($descriptors, null, 'type');
 
@@ -211,7 +211,13 @@ class PRRecordsComponentAssembler
 
     private static function formatPRRecord(\App\Models\PersonalRecord $pr, LiftLog $liftLog, ?array $descriptor, bool $isBeaten): array
     {
-        $isPureBodyweight = ($liftLog->exercise->log_type ?? '') === 'bodyweight' && $pr->pr_type === 'volume' && ($pr->weight == 0 || $pr->weight === null);
+        // Pure-bodyweight = a bodyweight-family exercise (by exercise_type, since the log_type may be
+        // any of several bodyweight logTypes e.g. 'bodyweight-reps') whose volume PR carries no added
+        // weight. Its volume value is a REP COUNT, so it uses the descriptor's bodyweightLabel + reps
+        // format rather than "Volume ... lbs".
+        $isPureBodyweight = ($liftLog->exercise->exercise_type ?? '') === 'bodyweight'
+            && $pr->pr_type === 'volume'
+            && ($pr->weight == 0 || $pr->weight === null);
         $label = self::resolveLabel($pr, $descriptor, $isPureBodyweight);
 
         $unitResolver = app(\App\Services\UnitResolver::class);

@@ -239,13 +239,35 @@ return [
         ],
     ],
 
+    // Maps a log_type OR exercise_type to its PR family. PrEngine::resolveFamily tries the log_type
+    // first, then falls back to the exercise_type, so BOTH vocabularies are covered here. This must
+    // stay aligned with the Athlete LOG_TYPE_TO_FAMILY (athlete/src/shared/logging/prDescriptors.js);
+    // the cross-app family-resolution contract test asserts they agree for every key.
     'logTypeToFamily' => [
+        // exercise_type values (Logger's derived type; used as the resolveFamily fallback)
         'regular' => 'weightlifting',
         'bodyweight' => 'bodyweight',
         'cardio' => 'cardio',
         'static_hold' => 'static_hold',
+        'load_output' => 'load_output',
+
+        // Athlete log_type values (what a synced exercise carries in log_type)
+        'barbell' => 'weightlifting',
+        'single-dumbbell' => 'weightlifting',
+        'dual-dumbbell' => 'weightlifting',
+        'kettlebell' => 'weightlifting',
+        'ball' => 'weightlifting',
+        'machine' => 'weightlifting',
+        'bodyweight-reps' => 'bodyweight',
+        'added-weight' => 'bodyweight',
+        'cardio-distance' => 'cardio',
+        'cardio-calories' => 'cardio',
+        'static-hold' => 'static_hold',
+        'dual-kettlebell' => 'static_hold',
         'sled' => 'load_output',
         'weighted-carry' => 'load_output',
+
+        // banded: no PRs
         'banded' => null,
         'banded_resistance' => null,
         'banded_assistance' => null,

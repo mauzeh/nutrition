@@ -124,12 +124,23 @@ final class PrEngine
     }
 
     /**
-     * Resolve PR family for a given log type string.
+     * Resolve the PR family for an exercise. Tries the log_type first, then falls back to the
+     * exercise_type when the log_type is absent OR present-but-unmapped (e.g. 'bodyweight-reps' is a
+     * real Athlete log_type that isn't a family key on its own — it must resolve via exercise_type
+     * 'bodyweight'). A key mapped explicitly to null (banded) means "no PRs" and is preserved.
+     * Only a type unknown to BOTH maps falls back to the weightlifting default.
      */
     public function resolveFamily(?string $logType, ?string $exerciseType = null): ?string
     {
-        $type = $logType ?: ($exerciseType ?: 'regular');
-        return config("pr_families.logTypeToFamily.{$type}", config("pr_families.logTypeToFamily.regular"));
+        $map = config('pr_families.logTypeToFamily', []);
+
+        foreach ([$logType, $exerciseType] as $candidate) {
+            if ($candidate !== null && $candidate !== '' && array_key_exists($candidate, $map)) {
+                return $map[$candidate];
+            }
+        }
+
+        return $map['regular'] ?? 'weightlifting';
     }
 
     private function extractSets(mixed $log): array
