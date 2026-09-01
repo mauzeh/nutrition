@@ -113,8 +113,16 @@ final class Reductions
             $reps = self::extractValue($set, $repField);
 
             if ($weight !== null && $reps !== null && $weight > 0 && $reps > 0) {
-                // Epley formula: weight * (1 + reps / 30)
-                $est1RM = $reps === 1 ? (float)$weight : (float)($weight * (1 + $reps / 30.0));
+                // Epley variant — MUST match BaseExerciseType::calculate1RM and the Athlete
+                // engine (calculate1RM): coefficient 0.0333, effective reps capped at 10
+                // (formulas are unreliable past 10 reps). A prior reps/30 form here diverged
+                // from the frozen cross-app contract; the contract suite guards this.
+                if ($reps === 1) {
+                    $est1RM = (float) $weight;
+                } else {
+                    $effectiveReps = min($reps, 10);
+                    $est1RM = (float) ($weight * (1 + (0.0333 * $effectiveReps)));
+                }
                 if ($best1RM === null || $est1RM > $best1RM) {
                     $best1RM = $est1RM;
                 }
@@ -144,7 +152,15 @@ final class Reductions
                     $validKey = false;
                     break;
                 }
-                $keyParts[] = (string)$kVal;
+                // A weight key component (e.g. the speed bucket's loadComp) MUST be the
+                // whole-pound rounded value — byte-identical to the Athlete engine's
+                // buildCompositeKey (Math.round(toComparable(...))). extractValue yields the
+                // 2-decimal kg→lbs value; without this round a kg log would bucket as
+                // "220.46|50" while Athlete buckets "220|50", silently diverging speed PRs.
+                if ($kf === 'weight') {
+                    $kVal = (int) round((float) $kVal);
+                }
+                $keyParts[] = (string) $kVal;
             }
 
             if (!$validKey) {

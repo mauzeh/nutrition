@@ -578,18 +578,21 @@ class PRInfoDisplayTest extends TestCase
     }
 
     /** @test */
-    public function hypertrophy_pr_matches_weights_within_tolerance()
+    public function hypertrophy_pr_buckets_weights_by_whole_pound()
     {
-        // Create a previous lift log with 9 reps at 200.5 lbs (kg conversion)
+        // Frozen cross-app PR spec: hypertrophy buckets are keyed by the WHOLE-POUND weight
+        // (round to the nearest lb), identical to the Athlete engine's composite key. There is
+        // no fuzzy ±0.5 lb matching — 200.4 and 200.0 both round to 200 and share a bucket, so
+        // a later log with more reps at (rounded) 200 beats the earlier one.
         $oldLog = LiftLog::factory()->create([
             'user_id' => $this->user->id,
             'exercise_id' => $this->exercise->id,
             'logged_at' => Carbon::now()->subDays(7)
         ]);
-        $oldLog->liftSets()->create(['weight' => 200.5, 'reps' => 9, 'notes' => '']);
+        $oldLog->liftSets()->create(['weight' => 200.4, 'reps' => 9, 'notes' => '']); // rounds to 200
         $this->triggerPRDetection($oldLog);
-        
-        // Create a new PR lift log with 11 reps at 200.0 lbs (should match within tolerance)
+
+        // 11 reps at 200.0 lbs — same whole-pound bucket (200) as the 200.4 log, more reps → PR.
         $newLog = LiftLog::factory()->create([
             'user_id' => $this->user->id,
             'exercise_id' => $this->exercise->id,
@@ -597,15 +600,13 @@ class PRInfoDisplayTest extends TestCase
         ]);
         $newLog->liftSets()->create(['weight' => 200.0, 'reps' => 11, 'notes' => '']);
         $this->triggerPRDetection($newLog);
-        
+
         $response = $this->actingAs($this->user)->get(route('mobile-entry.lifts'));
-        
+
         $response->assertStatus(200);
-        
-        // Should see PR badge
+
+        // Should see PR badge and the whole-pound bucket label.
         $response->assertSee('🏆 PR');
-        
-        // Should show "Best @ 200 lbs" (matched within tolerance)
         $response->assertSee('Best @ 200 lbs');
         $response->assertSee('9');
         $response->assertSee('11');

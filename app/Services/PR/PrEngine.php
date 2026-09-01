@@ -5,6 +5,9 @@ namespace App\Services\PR;
 use App\Models\LiftLog;
 use App\Models\PersonalRecord;
 
+// Reason ("why not") records are shaped exclusively by PrReasons so the detect loop below
+// stays a clean, line-for-line analogue of the Athlete engine's PR-detection loop.
+
 final class PrEngine
 {
     /**
@@ -74,15 +77,8 @@ final class PrEngine
                         'previous_value' => $res['best'],
                         'descriptor' => $descriptor,
                     ];
-                } else {
-                    $reasons[] = [
-                        'type' => $type,
-                        'current' => $res['current'],
-                        'best' => $res['best'],
-                        'direction' => $descriptor['direction'] ?? 'max',
-                        'tolerance' => $descriptor['tolerance'] ?? 'none',
-                        'deltaToBeat' => $res['best'] !== null ? $res['best'] - $res['current'] : null,
-                    ];
+                } elseif ($reason = PrReasons::forMiss($descriptor, $res)) {
+                    $reasons[] = $reason;
                 }
             } elseif ($descriptor['compare'] === 'keyedBest') {
                 $bestMap = is_array($typeHistory) ? $typeHistory : [];
@@ -104,16 +100,8 @@ final class PrEngine
                         }
 
                         $prs[] = $prItem;
-                    } else {
-                        $reasons[] = [
-                            'type' => $type,
-                            'key' => $key,
-                            'current' => $res['current'],
-                            'best' => $res['best'],
-                            'direction' => $descriptor['direction'] ?? 'max',
-                            'tolerance' => $descriptor['tolerance'] ?? 'none',
-                            'deltaToBeat' => $res['best'] !== null ? $res['best'] - $res['current'] : null,
-                        ];
+                    } elseif ($reason = PrReasons::forMiss($descriptor, $res, $key)) {
+                        $reasons[] = $reason;
                     }
                 }
             }

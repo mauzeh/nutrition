@@ -26,6 +26,7 @@ return [
                 'tolerance' => 'unit',
                 'store' => 'keyedByReps',
                 'maxReps' => 10,
+                'suppressDominated' => true,
                 'label' => 'Rep Max',
                 'format' => 'weight',
             ],

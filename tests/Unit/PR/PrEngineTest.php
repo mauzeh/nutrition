@@ -60,8 +60,9 @@ class PrEngineTest extends TestCase
     public function test_estimated_1rm_uses_epley_and_treats_single_rep_as_raw(): void
     {
         $sets = [['weight' => 100, 'reps' => 1], ['weight' => 100, 'reps' => 10]];
-        // Epley on the 10-rep set: 100 * (1 + 10/30) = 133.333 beats the raw 100.
-        $this->assertEqualsWithDelta(133.333, Reductions::estimated1RM($sets, 'weight', 'reps'), 0.001);
+        // Epley variant matching the frozen cross-app contract (coefficient 0.0333, reps
+        // capped at 10): 100 * (1 + 0.0333 * 10) = 133.3, which beats the raw 100.
+        $this->assertEqualsWithDelta(133.3, Reductions::estimated1RM($sets, 'weight', 'reps'), 0.001);
     }
 
     public function test_per_key_count_and_sum_reps(): void

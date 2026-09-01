@@ -219,13 +219,17 @@ class ExercisePRHighlightingTest extends TestCase
             ->get(route('exercises.show-logs', $exercise));
 
         $response->assertStatus(200);
-        
-        // Should see 2 PR badges:
-        // - The 5 rep lift (highest estimated 1RM)
-        // - The 1 rep lift (rep-specific PR - heaviest 1-rep lift)
+
+        // Should see 1 PR badge:
+        // - The 5 rep lift (highest estimated 1RM + its rep-specific best)
+        // The 1 rep lift is NOT a PR: 250×1 is DOMINATED by the earlier 300×5 (a heavier
+        // weight for more reps already stands), so the frozen cross-app PR spec's
+        // suppressDominated rule for the weightlifting family suppresses it. This matches the
+        // Athlete engine and the `dominated-rep-not-pr` contract fixture — the two apps agree
+        // a dominated single is not a personal record.
         $content = $response->getContent();
         $prBadgeCount = substr_count($content, '🏆 PR');
-        $this->assertEquals(2, $prBadgeCount, 'Expected 2 PR badges - both lifts are PRs (1RM and rep-specific)');
+        $this->assertEquals(1, $prBadgeCount, 'Expected 1 PR badge - the dominated 250×1 single is not a PR (suppressDominated)');
     }
 
     /** @test */
