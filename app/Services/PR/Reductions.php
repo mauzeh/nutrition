@@ -87,7 +87,10 @@ final class Reductions
             $product = 1;
             $hasNull = false;
             foreach ($factors as $factor) {
-                $val = self::extractValue($set, $factor);
+                // Volume converts mass kg→lbs at FULL precision (no per-set 2-decimal round) and
+                // sums, matching the Athlete engine's "sum then convert once" order. Per-set
+                // rounding (via extractValue) drifted the total by up to 0.01 vs Athlete.
+                $val = self::extractValueRaw($set, $factor);
                 if ($val === null) {
                     $hasNull = true;
                     break;
@@ -181,7 +184,10 @@ final class Reductions
                 $grouped[$compositeKey] = ($grouped[$compositeKey] ?? 0) + $reps;
             } elseif ($aggregate === 'maxValue') {
                 $val = self::extractValue($set, $valueField);
-                if ($val !== null) {
+                // Skip non-positive values (e.g. 0 added weight on a pure-bodyweight rep) so an
+                // unweighted set does not seed a 0-weight rep-max record — mirror of the Athlete
+                // rep-max reduction (which skips weight <= 0).
+                if ($val !== null && $val > 0) {
                     if (!isset($grouped[$compositeKey]) || $val > $grouped[$compositeKey]) {
                         $grouped[$compositeKey] = $val;
                     }
@@ -221,8 +227,25 @@ final class Reductions
         return (int) round($meters);
     }
 
-    private static function extractValue(mixed $set, string $field): float|int|null
+    /**
+     * Read a set field in the comparable frame. Mass (weight) converts kg→lbs; distance normalizes
+     * to integer meters. $roundMass controls whether the kg→lbs conversion is rounded to 2 decimals:
+     * true (default) for scalar/keyed reads whose stored value + unit tolerance need 2-dp precision;
+     * false for volume (sumProduct), which converts at full precision and rounds once at the end to
+     * match the Athlete engine's "sum then convert" order.
+     */
+    private static function extractValueRaw(mixed $set, string $field): float|int|null
     {
+        return self::extractValue($set, $field, roundMass: false);
+    }
+
+    private static function extractValue(mixed $set, string $field, bool $roundMass = true): float|int|null
+    {
+        $convertMass = function ($val) use ($roundMass) {
+            $lbs = (float) $val * 2.2046226218;
+            return $roundMass ? round($lbs, 2) : $lbs;
+        };
+
         if (is_array($set)) {
             $val = $set[$field] ?? null;
             if ($val === null && $field === 'duration') {
@@ -232,7 +255,7 @@ final class Reductions
                 $val = $set['rounds'] ?? null;
             }
             if ($field === 'weight' && $val !== null && strtolower((string)($set['unit'] ?? 'lbs')) === 'kg') {
-                $val = round((float)$val * 2.2046226218, 2);
+                $val = $convertMass($val);
             }
             if ($field === 'distance' && $val !== null) {
                 $val = self::normalizeDistance((float)$val, (string)($set['distance_unit'] ?? 'm'));
@@ -249,7 +272,7 @@ final class Reductions
                 $val = $set->rounds ?? null;
             }
             if ($field === 'weight' && $val !== null && strtolower((string)($set->unit ?? 'lbs')) === 'kg') {
-                $val = round((float)$val * 2.2046226218, 2);
+                $val = $convertMass($val);
             }
             if ($field === 'distance' && $val !== null) {
                 $val = self::normalizeDistance((float)$val, (string)($set->distance_unit ?? 'm'));

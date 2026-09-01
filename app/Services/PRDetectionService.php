@@ -158,7 +158,11 @@ class PRDetectionService
         foreach ($result['prs'] as $pr) {
             $val = $pr['value'];
             $prevVal = $pr['previous_value'];
-            if (strtolower($logUnit) === 'kg' && in_array($pr['type'], ['one_rm', 'rep_specific', 'volume', 'hypertrophy'])) {
+            // Mass-dimensioned PR values are de-normalized back to the log unit. NOT hypertrophy —
+            // its value is a REP COUNT (dimensionless, like density's set count), so converting it
+            // by the kg factor produced nonsense (e.g. 9 reps → 4.08). one_rm / rep_specific /
+            // volume / load all carry a mass value (load = heaviest load_output weight).
+            if (strtolower($logUnit) === 'kg' && in_array($pr['type'], ['one_rm', 'rep_specific', 'volume', 'load'])) {
                 if (is_numeric($val)) {
                     $val = round($val / 2.2046226218, 2);
                 }

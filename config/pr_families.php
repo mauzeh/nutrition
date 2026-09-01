@@ -113,6 +113,9 @@ return [
                 'format' => 'distance',
             ],
             [
+                // Cardio "distance per round": sumOf-of-distance keyed by round count — a generic
+                // single-key record (store 'keyed'), not the weight rep-max shape. Aligned with the
+                // Athlete descriptor.
                 'type' => 'rep_specific',
                 'reduce' => 'sumOf',
                 'compare' => 'keyedBest',
@@ -120,7 +123,7 @@ return [
                 'field' => 'distance',
                 'direction' => 'max',
                 'tolerance' => 'distance',
-                'store' => 'keyedByReps',
+                'store' => 'keyed',
                 'label' => 'Best Distance per Round',
                 'format' => 'distance',
             ],
