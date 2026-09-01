@@ -151,7 +151,7 @@ class PRInfoDisplayTest extends TestCase
         $response = $this->actingAs($this->user)->get(route('mobile-entry.lifts'));
         
         $response->assertStatus(200);
-        $response->assertSee('5 Reps');
+        $response->assertSee('5-rep max');
         $response->assertSee('200 lbs'); // The record to beat
     }
 
@@ -245,9 +245,9 @@ class PRInfoDisplayTest extends TestCase
         $response->assertStatus(200);
         
         // Should see current records with multiple types
-        $response->assertSee('Est 1RM');
+        $response->assertSee('Est. 1RM');
         $response->assertSee('Volume');
-        $response->assertSee('5 Rep');
+        $response->assertSee('5-rep max');
     }
 
     /** @test */
@@ -319,12 +319,12 @@ class PRInfoDisplayTest extends TestCase
         $response->assertSee('🏆 PR');
         
         // Should see "1 Rep" row
-        $response->assertSee('1 Rep');
+        $response->assertSee('1-rep max');
         $response->assertSee('200');
         $response->assertSee('225');
         
         // Should NOT see "Est 1RM" or "1RM" label since it would be the same as "1 Rep"
-        $response->assertDontSee('Est 1RM');
+        $response->assertDontSee('Est. 1RM');
         $response->assertDontSee('1RM');
     }
 
@@ -357,8 +357,8 @@ class PRInfoDisplayTest extends TestCase
         $response->assertSee('🏆 PR');
         
         // Should see BOTH "Est 1RM" (estimated) and "5 Reps" rows
-        $response->assertSee('Est 1RM');
-        $response->assertSee('5 Reps');
+        $response->assertSee('Est. 1RM');
+        $response->assertSee('5-rep max');
         
         // Should see the rep-specific PR
         $response->assertSee('180');
@@ -397,8 +397,8 @@ class PRInfoDisplayTest extends TestCase
         // Should see BOTH "Est 1RM" (estimated from 3 reps) and "3 Reps" rows
         // Even though the estimated 1RM might be close to a previous true 1RM,
         // they are different values and should both be shown
-        $response->assertSee('Est 1RM');
-        $response->assertSee('3 Reps');
+        $response->assertSee('Est. 1RM');
+        $response->assertSee('3-rep max');
     }
 
     /** @test */
@@ -536,7 +536,7 @@ class PRInfoDisplayTest extends TestCase
         $response->assertSee('🏆 PR');
         
         // Should see "Best @ 200 lbs" row showing rep progression
-        $response->assertSee('Best @ 200 lbs');
+        $response->assertSee('Reps at 200');
         $response->assertSee('10');
         $response->assertSee('12');
     }
@@ -572,7 +572,7 @@ class PRInfoDisplayTest extends TestCase
         $response->assertSee('🏆 PR');
         
         // Should show "Best @ 205 lbs" (the heaviest weight)
-        $response->assertSee('Best @ 205 lbs');
+        $response->assertSee('Reps at 205');
         $response->assertSee('8');
         $response->assertSee('10');
     }
@@ -607,7 +607,7 @@ class PRInfoDisplayTest extends TestCase
 
         // Should see PR badge and the whole-pound bucket label.
         $response->assertSee('🏆 PR');
-        $response->assertSee('Best @ 200 lbs');
+        $response->assertSee('Reps at 200');
         $response->assertSee('9');
         $response->assertSee('11');
     }
@@ -654,8 +654,8 @@ class PRInfoDisplayTest extends TestCase
         $response->assertSee('🏆 PR');
         
         // Should see BOTH the rep-specific PR and the hypertrophy PR
-        $response->assertSee('10 Reps'); // Rep-specific PR (200 → 205 lbs)
-        $response->assertSee('Best @ 205 lbs'); // Hypertrophy PR (8 → 10 reps)
+        $response->assertSee('10-rep max'); // Rep-specific PR (200 → 205 lbs)
+        $response->assertSee('Reps at 205'); // Hypertrophy PR (8 → 10 reps)
         $response->assertSee('8'); // Previous best at 205 lbs
     }
 
@@ -688,7 +688,7 @@ class PRInfoDisplayTest extends TestCase
         $response->assertSee('🏆 PR');
         
         // Should NOT see "Best @ 200 lbs" since this is the first time at this weight
-        $response->assertDontSee('Best @ 200 lbs');
+        $response->assertDontSee('Reps at 200');
     }
 
     /** @test */
@@ -723,8 +723,8 @@ class PRInfoDisplayTest extends TestCase
         $response->assertSee('🏆 PR');
         
         // Should see "Records beaten" table with the 5-rep and Est 1RM PRs
-        $response->assertSee('5 Reps');
-        $response->assertSee('Est 1RM');
+        $response->assertSee('5-rep max');
+        $response->assertSee('Est. 1RM');
         $response->assertSee('180'); // Previous 5-rep value
         $response->assertSee('200'); // New 5-rep value
         
@@ -767,7 +767,7 @@ class PRInfoDisplayTest extends TestCase
         $response->assertSee('🏆 PR');
         
         // Should see "8 Reps" in the records beaten table
-        $response->assertSee('8 Reps');
+        $response->assertSee('8-rep max');
         
         // Should see "—" for the previous value (first time doing 8 reps)
         // The HTML entity for em dash is &#8212; or the actual character —

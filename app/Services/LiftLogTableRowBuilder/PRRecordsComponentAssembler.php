@@ -187,18 +187,32 @@ class PRRecordsComponentAssembler
         return $records;
     }
 
+    /**
+     * Resolve a PR row label from the descriptor config — CONFIG-DRIVEN and aligned with the Athlete
+     * engine's templating (no per-pr_type if-chain). The descriptor's `label` is a template:
+     * `{n}` → rep count, `{w}` → weight key. A pure-bodyweight volume PR uses the descriptor's
+     * optional `bodyweightLabel` ("Total Reps"). Identical convention to
+     * athlete/src/shared/logging/prDescriptors.js.
+     */
+    private static function resolveLabel(\App\Models\PersonalRecord $pr, ?array $descriptor, bool $isPureBodyweight): string
+    {
+        if ($isPureBodyweight && !empty($descriptor['bodyweightLabel'])) {
+            return $descriptor['bodyweightLabel'];
+        }
+        $label = $descriptor['label'] ?? ucfirst(str_replace('_', ' ', $pr->pr_type));
+        if ($pr->rep_count !== null) {
+            $label = str_replace('{n}', (string) $pr->rep_count, $label);
+        }
+        if ($pr->weight !== null) {
+            $label = str_replace('{w}', (string) (float) $pr->weight, $label);
+        }
+        return $label;
+    }
+
     private static function formatPRRecord(\App\Models\PersonalRecord $pr, LiftLog $liftLog, ?array $descriptor, bool $isBeaten): array
     {
-        $label = $descriptor['label'] ?? ucfirst(str_replace('_', ' ', $pr->pr_type));
         $isPureBodyweight = ($liftLog->exercise->log_type ?? '') === 'bodyweight' && $pr->pr_type === 'volume' && ($pr->weight == 0 || $pr->weight === null);
-        
-        if ($isPureBodyweight) {
-            $label = 'Total Reps';
-        } elseif ($pr->pr_type === 'rep_specific' && $pr->rep_count) {
-            $label = $pr->rep_count . ' Rep' . ($pr->rep_count > 1 ? 's' : '');
-        } elseif ($pr->pr_type === 'hypertrophy' && $pr->weight) {
-            $label = 'Best @ ' . (float)$pr->weight . ' lbs';
-        }
+        $label = self::resolveLabel($pr, $descriptor, $isPureBodyweight);
 
         $unitResolver = app(\App\Services\UnitResolver::class);
         $viewer = auth()->user() ?? $liftLog->user;

@@ -17,7 +17,7 @@ use Tests\TestCase;
  *
  * Density calculation (perKey count, requirePrevious first-time suppression, weight-vs-
  * duration keying, tolerance) is covered in isolation by tests/Unit/PR/PrEngineTest.php.
- * This file keeps only the assembler rendering ("Max Sets @ Weight" label + set-count
+ * This file keeps only the assembler rendering ("Sets at {w}" label + set-count
  * formatting) and PR persistence the pure engine can't cover.
  */
 class DensityPRDetectionTest extends TestCase
@@ -62,7 +62,7 @@ class DensityPRDetectionTest extends TestCase
 
         $assembled = PRRecordsComponentAssembler::assemble($secondLog, new RowConfig());
         $records = $assembled[0]['data']['records'] ?? [];
-        $record = collect($records)->firstWhere('label', 'Max Sets @ Weight');
+        $record = collect($records)->firstWhere('label', 'Sets at 145');
 
         $this->assertNotNull($record);
         $this->assertEquals('1 set', $record['value']);
