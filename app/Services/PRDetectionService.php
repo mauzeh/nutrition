@@ -175,10 +175,10 @@ class PRDetectionService
             // volume / load all carry a mass value (load = heaviest load_output weight).
             if (strtolower($logUnit) === 'kg' && in_array($pr['type'], ['one_rm', 'rep_specific', 'volume', 'load'])) {
                 if (is_numeric($val)) {
-                    $val = round($val / 2.2046226218, 2);
+                    $val = round($val / UnitResolver::KG_TO_LBS, 2);
                 }
                 if (is_numeric($prevVal)) {
-                    $prevVal = round($prevVal / 2.2046226218, 2);
+                    $prevVal = round($prevVal / UnitResolver::KG_TO_LBS, 2);
                 }
             }
 

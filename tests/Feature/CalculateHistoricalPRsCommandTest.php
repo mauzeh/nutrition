@@ -168,4 +168,38 @@ class CalculateHistoricalPRsCommandTest extends TestCase
             ->expectsOutput('No lift logs or personal records found to process.')
             ->assertExitCode(1);
     }
+
+    /** @test */
+    public function it_recalculates_prs_under_canonical_factor_for_mixed_unit_logs()
+    {
+        $user = User::factory()->create();
+        $exercise = Exercise::factory()->create(['exercise_type' => 'regular', 'log_type' => 'weightlifting']);
+
+        // Log 1: 220.0 lbs set
+        $log1 = LiftLog::factory()->create([
+            'user_id' => $user->id,
+            'exercise_id' => $exercise->id,
+            'logged_at' => now()->subDays(2),
+            'is_pr' => false,
+        ]);
+        $log1->liftSets()->create(['weight' => 220.0, 'reps' => 1, 'unit' => 'lbs']);
+
+        // Log 2: 100 kg set (100 * 2.2046226218 = 220.46226218 lbs > 220.46 lbs)
+        $log2 = LiftLog::factory()->create([
+            'user_id' => $user->id,
+            'exercise_id' => $exercise->id,
+            'logged_at' => now()->subDays(1),
+            'is_pr' => false,
+        ]);
+        $log2->liftSets()->create(['weight' => 100, 'reps' => 1, 'unit' => 'kg']);
+
+        $this->artisan('prs:calculate-historical --force')->assertExitCode(0);
+
+        $log1->refresh();
+        $log2->refresh();
+
+        $this->assertTrue($log1->is_pr);
+        // Under full-precision factor, 100 kg (220.46226218 lbs) beats 220.46 lbs
+        $this->assertTrue($log2->is_pr);
+    }
 }

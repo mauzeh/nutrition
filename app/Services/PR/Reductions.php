@@ -2,6 +2,8 @@
 
 namespace App\Services\PR;
 
+use App\Services\UnitResolver;
+
 final class Reductions
 {
     /**
@@ -249,9 +251,8 @@ final class Reductions
     {
         $field = self::resolveField($field);
 
-        $convertMass = function ($val) use ($roundMass) {
-            $lbs = (float) $val * 2.2046226218;
-            return $roundMass ? round($lbs, 2) : $lbs;
+        $convertMass = function ($val) {
+            return (float) $val * UnitResolver::KG_TO_LBS;
         };
 
         if (is_array($set)) {

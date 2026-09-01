@@ -7,7 +7,7 @@ use App\Models\User;
 class UnitResolver
 {
     public const LBS_TO_KG = 0.45359237;
-    public const KG_TO_LBS = 2.20462262;
+    public const KG_TO_LBS = 2.2046226218;
 
     /**
      * Convert value from one unit to another with target-specific rounding.
