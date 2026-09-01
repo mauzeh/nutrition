@@ -6,8 +6,28 @@ Read first, in order:
 - `docs/antigravity-steering.md` (this repo) — hard rules, no-git, no-Pint, milestone testing.
 - `.kiro/steering/project-conventions.md`, `.kiro/steering/sync-api-context.md` — sync architecture,
   Actions pattern, event dispatch, soft deletes.
-- The cross-repo contract: `../../docs/plans/server-initiated-rehydration-and-exercise-merge.md`
-  (root). It defines the `/changes` `rehydrate` payload and the merge map. This slice must conform.
+> **Boundary rule:** this is a self-contained Logger task. Do NOT read, reference, or write anything
+> outside this repository (no `../../` paths, no root workspace, no other app). The cross-app contract
+> shapes this slice must produce are duplicated INLINE below so you never need to reach up. A separate
+> root-level contract task (run after both apps are implemented) reconciles the two apps — that is not
+> your concern here.
+
+### Cross-app shapes this slice must produce (inline — the contract, duplicated here)
+
+`/changes` `rehydrate` field (additive, optional; omit when nothing to signal):
+
+```jsonc
+{ "rehydrate": { "token": "2026-09-01T12:00:00Z", "reason": "exercise-merge" } }
+```
+- `token`: monotonic per user; an ISO-8601 UTC string so plain string comparison orders it.
+- `reason`: advisory label only.
+
+Exercise merge map (drives `mergeByMap`; pull-ups is the first entry):
+
+```jsonc
+{ "target": "strict_pull_up", "title": "Strict Pull-Ups", "sources": ["pull_up", "pull_ups"] }
+```
+- `target`/`sources` resolve to `Exercise` rows by `canonical_name`, then title (case-insensitive).
 
 ## What You're Building
 
@@ -39,8 +59,8 @@ are one exercise with correct combined-history PRs; the merge is reusable via a 
 - `database/migrations/` — the reconciliation/merge migration precedent
   (`2026_08_30_142524_retype_sled_and_carry_exercises_to_load_output.php`) shows how to repoint +
   recompute inside a migration safely (self-FK, soft-delete safety).
-- `app/Sync/Services/ExerciseReconciler.php` (if present) + `../../docs/sync/sync-exercise-reconciliation.md`
-  — the changeset/reconciler convention for reviewable, reversible data changes.
+- `app/Sync/Services/ExerciseReconciler.php` (if present) — the changeset/reconciler convention for
+  reviewable, reversible data changes (in-repo reference only).
 
 ## Execution Plan
 
@@ -129,7 +149,7 @@ are one exercise with correct combined-history PRs; the merge is reusable via a 
 
 - Namespace sync-only code under `app/Sync/`; the merge service is shared domain (stays in `app/Services/`).
 - Match sibling controller/service/test conventions. PHPUnit only, `--parallel`.
-- The `rehydrate` field shape must byte-match the root contract fixture (`token`, `reason`).
+- The `rehydrate` field shape must match the inline contract above (`token`, `reason`).
 
 ## Reversibility (be honest about the boundary)
 
@@ -154,7 +174,7 @@ plainly; do not claim a perfect rollback.
   NEW (higher) rehydration token after reverting, so clients rehydrate again against the reverted data
   and re-converge. Without this, clients would keep the merged local state after a server rollback.
 
-This matches `../../docs/sync/sync-exercise-reconciliation.md`, which classifies `merge` as "not
+This matches the platform's exercise-reconciliation convention, which classifies `merge` as "not
 reversible without backup — the changeset stores original state." The audit row + snapshot ARE that
 backup for the structural layer; the PR/social layer is re-derived, not restored.
 

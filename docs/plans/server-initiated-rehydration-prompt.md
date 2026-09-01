@@ -1,8 +1,12 @@
 # PROMPT — Server-Initiated Rehydration + Exercise Merge (Logger slice)
 
-Read `docs/antigravity-steering.md`, then `docs/plans/server-initiated-rehydration.md` (the plan), then
-the root contract `../../docs/plans/server-initiated-rehydration-and-exercise-merge.md`. Execute from
-THIS prompt; the plan is reference architecture.
+Read `docs/antigravity-steering.md`, then `docs/plans/server-initiated-rehydration.md` (the plan).
+Execute from THIS prompt; the plan is reference architecture.
+
+**Boundary rule (mandatory):** stay entirely within this repository. NEVER read, reference, or write
+files outside `logger/` — no `../../` paths, no root workspace, no other app directory. The cross-app
+shapes you must produce are duplicated inline in the plan; you never need to reach up. Reconciling the
+two apps happens in a separate root task run later — not here.
 
 Hard rules (from antigravity-steering): never commit/push, never run Pint, never run destructive DB
 commands, **never run the merge migration** (author only). Milestone testing with
