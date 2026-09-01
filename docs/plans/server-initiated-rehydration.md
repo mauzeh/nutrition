@@ -98,7 +98,13 @@ are one exercise with correct combined-history PRs; the merge is reusable via a 
    `ExerciseMergeReconciler`) where `$merge = ['target' => 'strict_pull_up', 'title' => 'Strict Pull-Ups',
    'sources' => ['pull_up','pull_ups', ... resolved to ids]]`. It must:
    - Resolve target + sources to `Exercise` rows by `canonical_name`, then by title (case-insensitive)
-     as fallback. Skip already-merged/absent sources (idempotent).
+     as fallback. **Scope resolution to GLOBAL exercises only** (`whereNull('user_id')`) and exclude
+     soft-deleted rows — this prevents matching user-owned or trashed duplicates. Skip
+     already-merged/absent sources (idempotent). If a source resolves to more than one candidate, do NOT
+     guess: fail the merge with a clear error (a merge must be unambiguous). Prefer resolving the
+     real-world rows by the DATA the migration knows (see migration step) rather than trusting canonical
+     slugs alone — in prod the pull-up canonicals are crossed (id 9 "Pull-Up" has canonical `pull_ups`;
+     id 258 "Pull-Ups" has canonical `pull_up`) and there are trashed user dupes `pull_ups_1`/`pull_ups_2`.
    - Inside a transaction, for each source: repoint `lift_logs.exercise_id` → target; transfer/collapse
      `exercise_intelligence`; create an `ExerciseAlias` for the source `canonical_name` and `title` on
      the target; write an `ExerciseMergeLog` audit row; soft-delete the source exercise.
@@ -118,6 +124,17 @@ are one exercise with correct combined-history PRs; the merge is reusable via a 
 
 10. Migration `..._merge_pull_up_variants.php`:
     - Define the merge map inline (or read from a committed changeset JSON per the reconciliation doc).
+    - **Exact prod rows (from a fresh prod copy) — resolve to these GLOBAL exercises, nothing else:**
+      target = id 263 "Strict Pull-Ups" (`canonical=strict_pull_up`, `bodyweight`); sources = id 9
+      "Pull-Up" (`canonical=pull_ups`, `bodyweight-reps`, 39 logs across users 1/34/20) and id 258
+      "Pull-Ups" (`canonical=pull_up`, `bodyweight`, 6 logs user 1). **Do NOT touch:** id 179 "Kipping
+      Pull-Up" (distinct movement), id 63 "Dumbbell Pull Up" (user-owned, distinct), ids 150/156
+      (soft-deleted user dupes, 0 logs). Because prod canonicals are crossed and dupes exist, the
+      migration should match sources by the specific `(title, log_type, user_id IS NULL)` tuples above,
+      not by canonical slug alone — keep resolution unambiguous. Note the merge crosses `log_type`
+      (`bodyweight-reps` sources into a `bodyweight` target); that is intentional — they are the same
+      movement and both resolve to the `bodyweight` PR family. Set the target `log_type` to the
+      canonical value the Athlete uses for `strict_pull_up`.
     - Call `mergeByMap($merge)` → get affected user ids.
     - For each affected `user_id`, call `PRRecalculationService::recalculateAllPRsForExercise($userId,
       $targetExerciseId)`.

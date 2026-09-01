@@ -64,9 +64,13 @@ Fill the Post-Execution Retro in this file, then print `AGY_COMPLETE: All milest
 ## Milestone 4 — Pull-up merge migration + combined-PR proof
 
 11. `php artisan make:migration merge_pull_up_variants --no-interaction`. In `up()`:
-    define `$merge = ['target' => 'strict_pull_up', 'title' => 'Strict Pull-Ups', 'sources' => ['pull_up','pull_ups']]`
-    (resolution by canonical_name/title inside the service handles the actual rows — the real DB titles
-    are "Pull-Up", "Pull-Ups", "Strict Pull-Ups"; encode the source titles the service will match on).
+    define the merge to resolve these EXACT global rows (verified against a fresh prod copy):
+    target = "Strict Pull-Ups" (`strict_pull_up`, `bodyweight`); sources = "Pull-Up"
+    (`bodyweight-reps`) and "Pull-Ups" (`bodyweight`). Match by `(title, log_type, user_id IS NULL,
+    not trashed)` — NOT by canonical slug alone (prod canonicals are crossed: "Pull-Up" has canonical
+    `pull_ups`, "Pull-Ups" has `pull_up`). **Must NOT touch:** "Kipping Pull-Up", "Dumbbell Pull Up"
+    (user-owned), or the soft-deleted user dupes "Pull-ups" (`pull_ups_1`/`pull_ups_2`). If resolution
+    is ambiguous or a source is missing, fail loudly (no guessing).
     Call `mergeByMap`, then `recalculateAllPRsForExercise` per affected user for the target, then
     `RehydrationService::raiseForUsers($affected, 'exercise-merge')`. Idempotent guard. **Do not run it.**
     `down()` = STRUCTURAL reverse only (see the plan's Reversibility section): repoint the audited
