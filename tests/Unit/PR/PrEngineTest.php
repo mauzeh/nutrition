@@ -295,6 +295,15 @@ class PrEngineTest extends TestCase
         $this->assertEquals(1200, $metrics['volume']);   // total
     }
 
+    public function test_bodyweight_family_computes_and_detects_volume(): void
+    {
+        $engine = new PrEngine();
+        $metrics = $engine->computeMetrics(['liftSets' => [['weight' => 0, 'reps' => 20]]], 'bodyweight');
+        $this->assertEquals(20, $metrics['volume']);
+        $detected = $engine->detectPRs($metrics, [], 'bodyweight');
+        $this->assertContains('volume', array_column($detected['prs'], 'type'));
+    }
+
     public function test_load_output_speed_fires_only_after_a_prior_bucket(): void
     {
         $engine = new PrEngine();

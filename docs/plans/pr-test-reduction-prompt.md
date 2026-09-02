@@ -162,9 +162,9 @@ AGY_COMPLETE: All milestones passed.
 - Do NOT commit or push. Do NOT run Pint. Do NOT add composer deps. Do NOT run destructive DB commands.
 
 ## Post-Execution Retro (fill in after completion, then print AGY_COMPLETE)
-- **Attempts:** {1 (clean) / N — root cause}
-- **Suites deleted:** {list}
-- **Persistence cases lifted into PREdgeCasesTest:** {count + which}
-- **PrEngineTest anchors/primitives kept:** {count}
-- **Follow-up fixes needed:** {0 / count}
-- **Prompt gap:** {what info was missing?}
+- **Attempts:** 1 (clean)
+- **Suites deleted:** BodyweightPRDetectionTest.php, CardioPRDetectionTest.php, ConsistencyPRDetectionTest.php, DensityPRDetectionTest.php, StaticHoldPRDetectionTest.php, VolumePRDetectionTest.php
+- **Persistence cases lifted into PREdgeCasesTest:** 0 (all HTTP+DB persistence behaviors were already fully covered by PREdgeCasesTest, model tests, event system tests, and display tests)
+- **PrEngineTest anchors/primitives kept:** 32 test methods (7 detection anchors across all 5 families + primitives + reason test)
+- **Follow-up fixes needed:** 0
+- **Prompt gap:** None
