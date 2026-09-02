@@ -194,12 +194,9 @@ class PRRecordsComponentAssembler
      * optional `bodyweightLabel` ("Total Reps"). Identical convention to
      * athlete/src/shared/logging/prDescriptors.js.
      */
-    private static function resolveLabel(\App\Models\PersonalRecord $pr, ?array $descriptor, bool $isPureBodyweight): string
+    private static function resolveLabel(\App\Models\PersonalRecord $pr, ?array $descriptor): string
     {
-        if ($isPureBodyweight && !empty($descriptor['bodyweightLabel'])) {
-            return $descriptor['bodyweightLabel'];
-        }
-        $label = $descriptor['label'] ?? ucfirst(str_replace('_', ' ', $pr->pr_type));
+        $label = $descriptor['label'] ?? ($pr->pr_type === 'bodyweight_volume' ? 'Total Reps' : ucfirst(str_replace('_', ' ', $pr->pr_type)));
         if ($pr->rep_count !== null) {
             $label = str_replace('{n}', (string) $pr->rep_count, $label);
         }
@@ -211,23 +208,13 @@ class PRRecordsComponentAssembler
 
     private static function formatPRRecord(\App\Models\PersonalRecord $pr, LiftLog $liftLog, ?array $descriptor, bool $isBeaten): array
     {
-        // Pure-bodyweight = a bodyweight-family exercise (by exercise_type, since the log_type may be
-        // any of several bodyweight logTypes e.g. 'bodyweight-reps') whose volume PR carries no added
-        // weight. Its volume value is a REP COUNT, so it uses the descriptor's bodyweightLabel + reps
-        // format rather than "Volume ... lbs".
-        $isPureBodyweight = ($liftLog->exercise->exercise_type ?? '') === 'bodyweight'
-            && $pr->pr_type === 'volume'
-            && ($pr->weight == 0 || $pr->weight === null);
-        $label = self::resolveLabel($pr, $descriptor, $isPureBodyweight);
+        $label = self::resolveLabel($pr, $descriptor);
 
         $unitResolver = app(\App\Services\UnitResolver::class);
         $viewer = auth()->user() ?? $liftLog->user;
         $sourceUnit = $pr->unit ?? 'lbs';
 
-        $format = $descriptor['format'] ?? 'weight';
-        if ($isPureBodyweight) {
-            $format = 'reps';
-        }
+        $format = $descriptor['format'] ?? ($pr->pr_type === 'bodyweight_volume' ? 'reps' : 'weight');
         $formattedValue = match ($format) {
             'weight' => $unitResolver->formatForUser($pr->value, $sourceUnit, $viewer),
             'volume' => $unitResolver->formatForUser($pr->value, $sourceUnit, $viewer),

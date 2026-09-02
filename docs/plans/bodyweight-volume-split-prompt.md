@@ -185,9 +185,9 @@ AGY_COMPLETE: All milestones passed.
 - Do NOT touch `../athlete`/`../contracts`/`../docs`. Do NOT commit/push. Do NOT run Pint or destructive DB.
 
 ## Post-Execution Retro (fill after completion, per §4)
-- **Attempts:** {1 (clean) / N — root cause}
-- **Display heuristic replaced by pr_type:** {yes/no}
-- **Substitute-1 branch removed cleanly:** {yes/no — grep result}
-- **Chain isolation verified:** {test name}
-- **Follow-up fixes needed:** {0 / count}
-- **Prompt gap:** {what was missing?}
+- **Attempts:** 1 (clean)
+- **Display heuristic replaced by pr_type:** yes
+- **Substitute-1 branch removed cleanly:** yes — grep returned 0 matches in app/
+- **Chain isolation verified:** test_chain_isolation
+- **Follow-up fixes needed:** 0
+- **Prompt gap:** None

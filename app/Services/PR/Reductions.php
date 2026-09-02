@@ -30,7 +30,7 @@ final class Reductions
             'sumOf' => isset($descriptor['keyFields']) 
                 ? [ (string)(count($sets)) => self::sumOf($sets, $descriptor['field']) ]
                 : self::sumOf($sets, $descriptor['field']),
-            'sumProduct' => self::sumProduct($sets, $descriptor['factors']),
+            'sumProduct' => self::sumProduct($sets, $descriptor['factors'], $descriptor),
             'estimated1RM' => self::estimated1RM($sets, $descriptor['field'], $descriptor['repField']),
             'perKey' => self::perKey($sets, $descriptor),
             default => throw new \InvalidArgumentException("Unknown reduction primitive: {$descriptor['reduce']}"),
@@ -73,14 +73,28 @@ final class Reductions
         return $sum;
     }
 
-    public static function sumProduct(array $sets, array $factors): float|int
+    public static function sumProduct(array $sets, array $factors, array|string|null $descriptorOrMode = null): float|int|null
     {
-        $allZeroWeight = true;
-        foreach ($sets as $set) {
-            $w = self::extractValue($set, 'weight');
-            if ($w !== null && $w > 0) {
-                $allZeroWeight = false;
-                break;
+        $mode = is_array($descriptorOrMode) ? ($descriptorOrMode['mode'] ?? null) : $descriptorOrMode;
+
+        if ($mode === 'weighted') {
+            $hasAnyWeight = false;
+            foreach ($sets as $set) {
+                $w = self::extractValue($set, 'weight');
+                if ($w !== null && $w > 0) {
+                    $hasAnyWeight = true;
+                    break;
+                }
+            }
+            if (!$hasAnyWeight) {
+                return null;
+            }
+        } elseif ($mode === 'bodyweight') {
+            foreach ($sets as $set) {
+                $w = self::extractValue($set, 'weight');
+                if ($w !== null && $w > 0) {
+                    return null;
+                }
             }
         }
 
@@ -96,10 +110,6 @@ final class Reductions
                 if ($val === null) {
                     $hasNull = true;
                     break;
-                }
-                // If pure bodyweight log (all zero weight), treat zero weight factor as 1
-                if ($allZeroWeight && self::resolveField($factor) === 'weight' && $val == 0) {
-                    $val = 1;
                 }
                 $product *= $val;
             }

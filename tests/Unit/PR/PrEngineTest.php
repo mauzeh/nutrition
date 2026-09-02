@@ -50,11 +50,20 @@ class PrEngineTest extends TestCase
         $this->assertEquals(2000, Reductions::sumProduct($sets, ['weight', 'reps']));
     }
 
-    public function test_sum_product_treats_pure_bodyweight_zero_weight_as_reps_only(): void
+    public function test_sum_product_mode_aware_reduction(): void
     {
-        // All-zero-weight log => weight factor becomes 1, so volume == total reps.
-        $sets = [['weight' => 0, 'reps' => 12], ['weight' => 0, 'reps' => 8]];
-        $this->assertEquals(20, Reductions::sumProduct($sets, ['weight', 'reps']));
+        $zeroSets = [['weight' => 0, 'reps' => 12], ['weight' => 0, 'reps' => 8]];
+        $weightedSets = [['weight' => 25, 'reps' => 6], ['weight' => 25, 'reps' => 4]];
+
+        // Pure bodyweight mode with zero weight => sums reps (20)
+        $this->assertEquals(20, Reductions::sumProduct($zeroSets, ['reps'], 'bodyweight'));
+        // Pure bodyweight mode with weighted sets => returns null
+        $this->assertNull(Reductions::sumProduct($weightedSets, ['reps'], 'bodyweight'));
+
+        // Weighted mode with zero weight => returns null
+        $this->assertNull(Reductions::sumProduct($zeroSets, ['weight', 'reps'], 'weighted'));
+        // Weighted mode with weighted sets => sums weight*reps (250)
+        $this->assertEquals(250, Reductions::sumProduct($weightedSets, ['weight', 'reps'], 'weighted'));
     }
 
     public function test_estimated_1rm_uses_epley_and_treats_single_rep_as_raw(): void
@@ -295,13 +304,30 @@ class PrEngineTest extends TestCase
         $this->assertEquals(1200, $metrics['volume']);   // total
     }
 
-    public function test_bodyweight_family_computes_and_detects_volume(): void
+    public function test_bodyweight_family_computes_and_detects_bodyweight_volume(): void
     {
         $engine = new PrEngine();
         $metrics = $engine->computeMetrics(['liftSets' => [['weight' => 0, 'reps' => 20]]], 'bodyweight');
-        $this->assertEquals(20, $metrics['volume']);
+        $this->assertArrayNotHasKey('volume', $metrics);
+        $this->assertEquals(20, $metrics['bodyweight_volume']);
         $detected = $engine->detectPRs($metrics, [], 'bodyweight');
-        $this->assertContains('volume', array_column($detected['prs'], 'type'));
+        $types = array_column($detected['prs'], 'type');
+        $this->assertContains('bodyweight_volume', $types);
+        $this->assertNotContains('volume', $types);
+    }
+
+    public function test_bodyweight_family_weighted_session_only_computes_volume(): void
+    {
+        $engine = new PrEngine();
+        $metrics = $engine->computeMetrics(['liftSets' => [['weight' => 25, 'reps' => 10]]], 'bodyweight');
+        $this->assertArrayHasKey('volume', $metrics);
+        $this->assertArrayNotHasKey('bodyweight_volume', $metrics);
+        $this->assertEquals(250, $metrics['volume']);
+
+        $detected = $engine->detectPRs($metrics, [], 'bodyweight');
+        $types = array_column($detected['prs'], 'type');
+        $this->assertContains('volume', $types);
+        $this->assertNotContains('bodyweight_volume', $types);
     }
 
     public function test_load_output_speed_fires_only_after_a_prior_bucket(): void

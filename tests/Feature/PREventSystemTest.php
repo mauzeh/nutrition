@@ -345,9 +345,9 @@ class PREventSystemTest extends TestCase
         $prCount = PersonalRecord::where('lift_log_id', $liftLog->id)->count();
         $this->assertEquals(1, $prCount, 'First bodyweight lift should create a Volume PR');
         
-        // Verify it's a volume PR
+        // Verify it's a bodyweight_volume PR
         $pr = PersonalRecord::where('lift_log_id', $liftLog->id)->first();
-        $this->assertEquals('volume', $pr->pr_type);
+        $this->assertEquals('bodyweight_volume', $pr->pr_type);
         $this->assertEquals(10, $pr->value); // Total reps
         
         $liftLog->refresh();
