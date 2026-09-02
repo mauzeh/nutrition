@@ -119,9 +119,32 @@ This loop is non-negotiable. Never report a failure and stop. Never ask for help
 
 After all milestones pass and before printing the completion signal, write the Post-Execution Retro into the prompt file itself. Find the `## Post-Execution Retro` section at the bottom of the prompt `.md` file and replace the `{placeholder}` values with actual data from your execution using `str_replace`. This is a file write, not a console print. Fill in ALL fields.
 
+### End-of-Run Cleanup Sweep (MANDATORY — before AGY_COMPLETE)
+
+The "No dead code" principle (§10) is a pass/fail GATE, not a hope. Before printing the completion signal,
+you MUST sweep the files you touched — a green PHPUnit suite does NOT prove the absence of dead code (an
+unused method, an orphaned class, or a compat shim all pass).
+
+> **Tooling note:** Pint is BANNED for antigravity runs (`safe-operations.md`), and this project has no
+> PHPStan/Larastan configured. So this sweep is done by INSPECTION + grep, NOT by running a linter. Do
+> not run Pint or any formatter.
+
+1. **No orphaned/removed-code residue.** If you removed the caller(s) of a method/class/route, remove the
+   dead code too — never leave a no-op stub or empty "legacy" method "to be safe." Grep the removed symbol
+   (method name, class, route name) across `app/` + `routes/` to confirm zero references remain.
+2. **No unused imports (`use` statements).** Inspect the `use` block of every file you edited; remove any
+   `use` you no longer reference.
+3. **No fallback / backward-compat shims.** No `?? $oldColumn` dual-reads, no "just in case" branches, no
+   commented-out old code, no TODO/FIXME. If a boundary/migration is done correctly the old shape is
+   unreachable — a surviving fallback is dead code by construction (see §13 Consumer Impact Trace).
+4. **No leftover artifacts.** Delete any temporary `.php` scripts you wrote; no stray `dd()`/`dump()`/
+   `Log::` debug noise beyond intended logging; delete `.test-output.txt`.
+
+If it finds nothing, say so. If it finds something, fix it and re-run the affected tests BEFORE AGY_COMPLETE.
+
 ### Completion Signal
 
-After the retro is written to the file, print exactly this line as your final output:
+After all milestones pass, the retro is written, AND the cleanup sweep is clean, print exactly this line as your final output:
 
 ```
 AGY_COMPLETE: All milestones passed.
