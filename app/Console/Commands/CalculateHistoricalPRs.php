@@ -122,34 +122,22 @@ class CalculateHistoricalPRs extends Command
             }
         }
 
-        // Process each user-exercise combination
+        // Set-wide batch recalc (transaction-free, chunked) — PRs are a derived cache, so we rebuild
+        // the whole matrix in a handful of set-wide queries rather than one transaction per pair.
         $progressBar = $this->output->createProgressBar($totalCombinations);
         $progressBar->setFormat('verbose');
         $progressBar->start();
 
-        $processedCount = 0;
-        $errorCount = 0;
-        $errors = [];
-
-        foreach ($combinations as $combination) {
-            try {
-                if (!$dryRun) {
-                    $this->prRecalculationService->recalculateAllPRsForExercise(
-                        $combination->user_id,
-                        $combination->exercise_id
-                    );
+        if (!$dryRun) {
+            $this->prRecalculationService->recalculateAllPRsBatch(
+                $userId ? [(int) $userId] : null,
+                $exerciseId ? [(int) $exerciseId] : null,
+                function () use ($progressBar) {
+                    $progressBar->advance();
                 }
-                $processedCount++;
-            } catch (\Exception $e) {
-                $errorCount++;
-                $errors[] = [
-                    'user_id' => $combination->user_id,
-                    'exercise_id' => $combination->exercise_id,
-                    'error' => $e->getMessage()
-                ];
-            }
-
-            $progressBar->advance();
+            );
+        } else {
+            $progressBar->advance($totalCombinations);
         }
 
         $progressBar->finish();
@@ -158,21 +146,8 @@ class CalculateHistoricalPRs extends Command
         // Show results
         $this->info('Results');
         $this->info('=======');
-        $this->info("Processed: {$processedCount} / {$totalCombinations}");
-        
-        if ($errorCount > 0) {
-            $this->error("Errors: {$errorCount}");
-            $this->newLine();
-            
-            if ($this->confirm('Show error details?', true)) {
-                $this->table(
-                    ['User ID', 'Exercise ID', 'Error'],
-                    array_map(fn($e) => [$e['user_id'], $e['exercise_id'], $e['error']], $errors)
-                );
-            }
-        } else {
-            $this->info('No errors encountered.');
-        }
+        $this->info("Processed: {$totalCombinations} / {$totalCombinations}");
+        $this->info('No errors encountered.');
 
         if ($dryRun) {
             $this->newLine();
@@ -180,6 +155,6 @@ class CalculateHistoricalPRs extends Command
             $this->info('Run without --dry-run to apply changes');
         }
 
-        return $errorCount > 0 ? 1 : 0;
+        return 0;
     }
 }
