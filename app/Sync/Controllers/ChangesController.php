@@ -6,6 +6,7 @@ use App\Models\LiftLog;
 use App\Sync\Services\SetFieldMapper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class ChangesController
 {
@@ -15,7 +16,7 @@ class ChangesController
     ) {}
 
     /**
-     * Return all logs for the authenticated user.
+     * Return logs and changes for the authenticated user.
      * Used by the Athlete app to pull changes made on Logger.
      *
      * GET /api/sync/changes
@@ -24,11 +25,23 @@ class ChangesController
     {
         $user = $request->user();
 
-        // Fetch all logs for this user
-        $liftLogs = LiftLog::with(['exercise', 'liftSets'])
-            ->where('user_id', $user->id)
-            ->orderBy('logged_at', 'asc')
-            ->get();
+        $since = null;
+        if ($request->filled('since')) {
+            $request->validate([
+                'since' => 'date',
+            ]);
+            $since = Carbon::parse($request->query('since'));
+        }
+
+        // Fetch logs for this user
+        $liftLogsQuery = LiftLog::with(['exercise', 'liftSets'])
+            ->where('user_id', $user->id);
+
+        if ($since !== null) {
+            $liftLogsQuery->where('updated_at', '>=', $since);
+        }
+
+        $liftLogs = $liftLogsQuery->orderBy('logged_at', 'asc')->get();
 
         $logsData = [];
         foreach ($liftLogs as $liftLog) {
@@ -91,13 +104,39 @@ class ChangesController
         }
 
         // Also include soft-deleted log IDs so client can remove them
-        $deletedLogs = LiftLog::onlyTrashed()
-            ->where('user_id', $user->id)
-            ->pluck('id')
-            ->toArray();
+        $deletedLogsQuery = LiftLog::onlyTrashed()
+            ->where('user_id', $user->id);
+
+        if ($since !== null) {
+            $deletedLogsQuery->where('deleted_at', '>=', $since);
+        }
+
+        $deletedLogs = $deletedLogsQuery->pluck('id')->toArray();
+
+        // Compute cursor: max high-water mark across user's logs (including trashed)
+        $maxUpdated = LiftLog::withTrashed()->where('user_id', $user->id)->orderBy('updated_at', 'desc')->first()?->updated_at;
+        $maxDeleted = LiftLog::onlyTrashed()->where('user_id', $user->id)->orderBy('deleted_at', 'desc')->first()?->deleted_at;
+
+        $maxInstant = null;
+        if ($maxUpdated && $maxDeleted) {
+            $maxInstant = $maxUpdated->gte($maxDeleted) ? $maxUpdated : $maxDeleted;
+        } elseif ($maxUpdated) {
+            $maxInstant = $maxUpdated;
+        } elseif ($maxDeleted) {
+            $maxInstant = $maxDeleted;
+        }
+
+        if ($since !== null && ($maxInstant === null || $since->gt($maxInstant))) {
+            $cursorInstant = $since;
+        } else {
+            $cursorInstant = $maxInstant ?? now();
+        }
+
+        $cursor = $cursorInstant->toIso8601String();
 
         $payload = [
             'status' => 'ok',
+            'cursor' => $cursor,
             'logs' => $logsData,
             'deleted_ids' => $deletedLogs,
             'userExercises' => $this->getUserExercises($user),

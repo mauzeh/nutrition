@@ -125,9 +125,9 @@ AGY_COMPLETE: All milestones passed.
 - Do NOT add a migration or schema change. Do NOT commit/push. Do NOT run Pint. Do NOT add composer deps.
 
 ## Post-Execution Retro (fill in after completion, then print AGY_COMPLETE)
-- **Attempts:** {1 (clean) / N — root cause}
-- **Boundary inclusivity test:** {how asserted}
-- **Old-tombstone-forever fix verified:** {how}
-- **cursor computed via:** {portable max approach}
-- **Cleanup sweep:** {clean / what was removed}
-- **Prompt gap:** {what info was missing?}
+- **Attempts:** 1 (clean)
+- **Boundary inclusivity test:** `test_since_inclusive_boundary` in `ChangesDeltaSyncTest.php` asserting that live log with `updated_at == T` and tombstone with `deleted_at == T` are included when `since = T`.
+- **Old-tombstone-forever fix verified:** `test_old_tombstone_forever_fix` in `ChangesDeltaSyncTest.php` asserting that soft-deleted log before `since` is excluded from `deleted_ids`.
+- **cursor computed via:** Max of `orderBy('updated_at', 'desc')` and `orderBy('deleted_at', 'desc')` Eloquent queries evaluated in PHP, taking `since` when nothing is newer.
+- **Cleanup sweep:** Clean; verified imports, no orphaned code or temp files, deleted `.test-output.txt`.
+- **Prompt gap:** None.
