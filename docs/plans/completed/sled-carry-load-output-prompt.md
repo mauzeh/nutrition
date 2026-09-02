@@ -148,9 +148,9 @@ Follow the phases in `docs/plans/sled-carry-load-output.md` in order. Each numbe
 - Do NOT copy SledExerciseType's raw-int weight comparison (D1) or inlined 0.3048 (D4).
 - Do NOT leave dead code after deleting SledExerciseType.
 
-## Post-Execution Retro (added after completion)
-> Fill in after antigravity finishes. Move both plan + prompt to `completed/` once all fields are set.
-- **Attempts:** {1 (clean) / N + root cause}
-- **Tests added:** {count}
-- **Prompt improvements for next time:** {…}
-- **Steering updates needed:** {yes/no + what}
+## Post-Execution Retro (derived from version-control history during cleanup)
+> Reconstructed from commits `e3a8d42b`, `90d53075`, `08d884bd`, `45bf2303` — not from firsthand review.
+- **Attempts:** 1 primary pass (`e3a8d42b` "Add load_output exercise type (sled + weighted-carry unification)"), then two follow-ups.
+- **Tests added:** 3 test files in the main commit, +2 in follow-up, +1 in follow-up 2.
+- **Prompt improvements for next time:** the migration path needed the most iteration — `90d53075` fixed is_pr detection + speed PR weight/unit, `08d884bd` fixed migration B sync/rollback + PR label/back-ref gaps, and `45bf2303` fixed migration B to clear legacy `sled_*` PRs without tripping the self-FK or soft-deletes. A prompt spec for the legacy-PR-clear + self-FK/soft-delete constraints up front would have saved a round.
+- **Steering updates needed:** yes — surfaced the "data-migration delete safety (SoftDeletes + self-FK)" steering note.

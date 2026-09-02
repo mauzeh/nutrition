@@ -99,10 +99,11 @@ reversible. Combined-history PR correctness proven by test.
 
 - Run the migration or any non-test DB write. Reuse `mergeExercises`. Add endpoints/deps. Commit. Pint.
 
-## Post-Execution Retro
+## Post-Execution Retro (derived from version-control history during cleanup)
 
-- **Milestones completed:** {placeholder}
-- **Follow-up fixes surfaced in review:** {placeholder}
-- **Deviations from plan:** {placeholder}
-- **Prompt gaps / ambiguities:** {placeholder}
-- **Test count before/after:** {placeholder}
+> Reconstructed from commit `c9cf57f4` — not from firsthand review.
+- **Milestones completed:** all — server-initiated rehydration + generalized exercise merge, landed in a single clean commit (`c9cf57f4`).
+- **Follow-up fixes surfaced in review:** 0 traced to this slice.
+- **Deviations from plan:** none recorded in history.
+- **Prompt gaps / ambiguities:** none surfaced.
+- **Test count before/after:** 4 test files touched by the commit (rehydration signal + exercise merge).

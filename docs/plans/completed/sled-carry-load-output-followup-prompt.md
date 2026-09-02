@@ -198,10 +198,11 @@ Add to `tests/Unit/Services/ExerciseTypes/LoadOutputExerciseTypeTest.php` and/or
 - Do NOT add conversion at sync ingress (`SetFieldMapper`/`StoreSyncLogAction` stay verbatim + unit stamp).
 - Do NOT touch `static_hold`'s behavior or its 300s cap.
 
-## Post-Execution Retro (fill in after completion)
-- **Attempts:** {1 (clean) / N + root cause}
-- **Approach chosen for Task 1:** {A wires PRType bitmask / B string-only + why}
-- **Speed weight/unit representation chosen:** {base-lbs+unit=lbs / raw+normalize-on-compare}
-- **Tests added:** {count}
-- **Prompt improvements for next time:** {…}
-- **Steering updates needed:** {yes/no + what}
+## Post-Execution Retro (derived from version-control history during cleanup)
+> Reconstructed from commit `90d53075` — not from firsthand review.
+- **Attempts:** 1 pass (`90d53075` "load_output follow-up: fix is_pr detection + speed PR weight/unit").
+- **Approach chosen for Task 1:** resolved via the load_output type + is_pr detection fix (see the paired plan for the PRType wiring).
+- **Speed weight/unit representation chosen:** speed PR weight/unit corrected in this follow-up to match the cross-app comparable frame.
+- **Tests added:** 2 test files touched.
+- **Prompt improvements for next time:** none of substance beyond what the follow-up-2 retro already captures.
+- **Steering updates needed:** no (covered by the sled-carry-load-output retro).

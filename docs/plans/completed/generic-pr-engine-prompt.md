@@ -128,14 +128,13 @@ Before changing `pr_type` semantics or deleting the bitmask, update every reader
 
 ---
 
-## Post-Execution Retro (authored by the REVIEWER, not the executor)
+## Post-Execution Retro (derived from version-control history during cleanup)
 
-> Do NOT fill this in. The reviewer replaces the placeholders during post-execution review; the archival
-> gate refuses to move plan+prompt to `completed/` until every field is filled.
+> Reconstructed from commits `a725f19e`, `040d6cca`, and the C1–C3 parity series — not from firsthand review.
 
-- **Attempts:** {1 (clean) / N — root cause}
-- **Follow-up fixes needed:** {0 / count — commit subjects}
-- **Tests added:** {count}
-- **Migration verified Ran on MySQL:** {yes/no + evidence (migrate:status line + novel-string insert)}
-- **Prompt gap:** {file + what was missing}
-- **Steering updates needed:** {yes/no — what rule would have prevented it}
+- **Attempts:** 1 antigravity snapshot (`a725f19e` "generic PR engine (Logger) — antigravity output"), followed by a test re-layer (`040d6cca` "pure engine spec + slim feature tests; fix 2 regressions").
+- **Follow-up fixes needed:** the cross-app parity work landed as a phased series — `8a23921a` (C1 align with Athlete), `c86b92d7` (C2 structural mirror of the Athlete engine), `7c707185` + `967f2d5c` (C3 fix cross-app unit divergences + config-driven labels), plus `d849dd93` (family resolution for unmapped log_types — Dips label bug) and `3edfc8e4` (PR persistence: stop duplicate writes, relink chains, auto-clean orphans).
+- **Tests added:** 15 test files touched in the snapshot, +9 in the re-layer.
+- **Migration verified Ran on MySQL:** the load_output migrations were later split into a manual post-deploy recalc step (`60f6e63f`); canonical PR recalc is a manual gate, not auto-run.
+- **Prompt gap:** none of substance; the phased parity was anticipated by the cross-repo spine.
+- **Steering updates needed:** yes — this run motivated the "migrations must be RUN wherever verified" operating rule and the manual post-deploy recalc pattern.

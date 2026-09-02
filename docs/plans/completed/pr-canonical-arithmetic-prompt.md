@@ -163,8 +163,9 @@ AGY_COMPLETE: All milestones passed.
 - Do NOT gate the recalc migration behind an env flag — it must run automatically on deploy.
 - Do NOT leave the migration Pending — run it and verify.
 
-## Post-Execution Retro (added after completion)
-- **Attempts:** {1 (clean) / N — root cause}
-- **Tests added:** {count}
-- **Prompt improvements for next time:** {what to add/change}
-- **Steering updates needed:** {yes/no, what}
+## Post-Execution Retro (derived from version-control history during cleanup)
+> Reconstructed from commits `d0d006ed`, `60f6e63f`, `12c0489e` — not from firsthand review.
+- **Attempts:** 1 clean antigravity pass (`d0d006ed` "Canonical PR arithmetic (Logger Phase 2) — antigravity output").
+- **Tests added:** 1 test file touched in the main commit (canonical-frame arithmetic).
+- **Prompt improvements for next time:** the migration strategy needed a follow-up — `60f6e63f` made the canonical PR recalc a manual post-deploy step (not an auto-run migration), and `12c0489e` added a fast, flat-memory batch recalc for scale. The prompt could have specified the recalc-at-scale + manual-gate approach up front.
+- **Steering updates needed:** no new rule beyond the already-recorded "migrations must be RUN wherever verified".
