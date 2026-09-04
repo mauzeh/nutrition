@@ -115,9 +115,12 @@ This loop is non-negotiable. Never report a failure and stop. Never ask for help
 - If a test failure is caused by YOUR changes — fix it immediately.
 - If a test was already failing before your changes (pre-existing, unrelated) — note it and continue. Never silence or delete existing tests.
 
-### Post-Execution Retro (Written to File)
+### Post-Execution Retro — do NOT write it
 
-After all milestones pass and before printing the completion signal, write the Post-Execution Retro into the prompt file itself. Find the `## Post-Execution Retro` section at the bottom of the prompt `.md` file and replace the `{placeholder}` values with actual data from your execution using `str_replace`. This is a file write, not a console print. Fill in ALL fields.
+Do NOT fill in the `## Post-Execution Retro` section of the prompt. The retro is reconstructed from the
+commit trail by the human reviewer at archive time (see `.kiro/steering/architect-workflow.md` →
+Post-Execution Review Protocol). Leave the `{placeholder}` values untouched. Your only end-of-run
+obligation is the cleanup sweep, then the completion signal.
 
 ### End-of-Run Cleanup Sweep (MANDATORY — before AGY_COMPLETE)
 

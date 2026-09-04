@@ -91,9 +91,9 @@ Follow the tasks in `{spec or plan path}` in order. Each numbered section is a p
 
 ---
 
-## Post-Execution Retro (added after completion)
+## Post-Execution Retro (authored by the REVIEWER, not the executor)
 
-> Fill this section in after antigravity finishes. Move both plan + prompt to `completed/`.
+> The executor must NOT fill this in — leave the `{placeholder}` values untouched. After the run, the human reviewer reconstructs this section from the commit trail at archive time (the `snapshot:` commit, the `cleanup:`/`fix:` follow-ups, any phased slices) and moves both plan + prompt to `completed/`. See `.kiro/steering/architect-workflow.md` → Post-Execution Review Protocol.
 
 - **Attempts:** {1 (clean) / N (root cause of failures)}
 - **Tests added:** {count}
