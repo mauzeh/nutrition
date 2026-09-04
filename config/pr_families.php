@@ -275,9 +275,13 @@ return [
         'cardio-distance' => 'cardio',
         'cardio-calories' => 'cardio',
         'static-hold' => 'static_hold',
-        'dual-kettlebell' => 'static_hold',
         'sled' => 'load_output',
         'weighted-carry' => 'load_output',
+        'weighted-carry-1-kb' => 'load_output',
+        'weighted-carry-2-kb' => 'load_output',
+        'weighted-carry-1-db' => 'load_output',
+        'weighted-carry-2-db' => 'load_output',
+        'weighted-carry-ball' => 'load_output',
 
         // banded: no PRs
         'banded' => null,

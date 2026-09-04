@@ -50,12 +50,14 @@ class SetFieldMapper
                 break;
 
             case 'weighted-carry':
-                $columns['weight'] = $setData['weight'] ?? null;
-                $columns['time'] = $setData['duration'] ?? null;
-                break;
-
-            case 'dual-kettlebell':
-                $columns['weight'] = $setData['kbWeight'] ?? $setData['weight'] ?? null;
+            case 'weighted-carry-1-kb':
+            case 'weighted-carry-2-kb':
+            case 'weighted-carry-1-db':
+            case 'weighted-carry-2-db':
+            case 'weighted-carry-ball':
+                $columns['weight'] = $setData['kbWeight'] ?? $setData['ballWeight'] ?? $setData['weight'] ?? null;
+                $columns['distance'] = $setData['distance'] ?? null;
+                $columns['distance_unit'] = $setData['distanceUnit'] ?? $setData['distance_unit'] ?? null;
                 $columns['time'] = $setData['duration'] ?? null;
                 break;
 
@@ -124,8 +126,14 @@ class SetFieldMapper
                 break;
 
             case 'weighted-carry':
-            case 'dual-kettlebell':
+            case 'weighted-carry-1-kb':
+            case 'weighted-carry-2-kb':
+            case 'weighted-carry-1-db':
+            case 'weighted-carry-2-db':
+            case 'weighted-carry-ball':
                 $data['weight'] = $set->weight;
+                $data['distance'] = $set->distance;
+                $data['distance_unit'] = $set->distance_unit;
                 $data['duration'] = $set->time;
                 break;
 
