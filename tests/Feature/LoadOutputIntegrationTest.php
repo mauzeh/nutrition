@@ -22,7 +22,7 @@ class LoadOutputIntegrationTest extends TestCase
         $resolver = new ExerciseResolverService();
         $user = User::factory()->create();
 
-        $carryEx = $resolver->resolve('Farmer Carry', $user, 'weighted-carry');
+        $carryEx = $resolver->resolve('Farmer Carry', $user, 'weighted-carry-2-kb');
         $this->assertEquals('load_output', $carryEx->exercise_type);
 
         $sledEx = $resolver->resolve('Sled Push', $user, 'sled');
@@ -30,9 +30,6 @@ class LoadOutputIntegrationTest extends TestCase
 
         $holdEx = $resolver->resolve('Plank', $user, 'static-hold');
         $this->assertEquals('static_hold', $holdEx->exercise_type);
-
-        $dkEx = $resolver->resolve('Dual KB Clean', $user, 'dual-kettlebell');
-        $this->assertEquals('static_hold', $dkEx->exercise_type);
     }
 
     /** @test */

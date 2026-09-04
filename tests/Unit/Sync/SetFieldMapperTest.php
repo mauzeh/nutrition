@@ -53,15 +53,23 @@ class SetFieldMapperTest extends TestCase
         $mapped = $this->mapper->mapToColumns('static-hold', ['duration' => 60], 'lbs');
         $this->assertEquals(60, $mapped['time']);
 
-        // 7. weighted-carry
-        $mapped = $this->mapper->mapToColumns('weighted-carry', ['weight' => 50, 'duration' => 45], 'lbs');
-        $this->assertEquals(50, $mapped['weight']);
-        $this->assertEquals(45, $mapped['time']);
-
-        // 8. dual-kettlebell
-        $mapped = $this->mapper->mapToColumns('dual-kettlebell', ['kbWeight' => 32, 'duration' => 30], 'lbs');
+        // 7. weighted-carry logTypes
+        $mapped = $this->mapper->mapToColumns('weighted-carry-1-kb', ['kbWeight' => 32, 'distance' => 50, 'distanceUnit' => 'm', 'duration' => 30], 'lbs');
         $this->assertEquals(32, $mapped['weight']);
+        $this->assertEquals(50, $mapped['distance']);
+        $this->assertEquals('m', $mapped['distance_unit']);
         $this->assertEquals(30, $mapped['time']);
+
+        $mappedDb = $this->mapper->mapToColumns('weighted-carry-1-db', ['weight' => 40, 'distance' => 60, 'distance_unit' => 'ft', 'duration' => 25], 'lbs');
+        $this->assertEquals(40, $mappedDb['weight']);
+        $this->assertEquals(60, $mappedDb['distance']);
+        $this->assertEquals('ft', $mappedDb['distance_unit']);
+        $this->assertEquals(25, $mappedDb['time']);
+
+        $mappedBall = $this->mapper->mapToColumns('weighted-carry-ball', ['ballWeight' => 50, 'distance' => 30, 'duration' => 20], 'lbs');
+        $this->assertEquals(50, $mappedBall['weight']);
+        $this->assertEquals(30, $mappedBall['distance']);
+        $this->assertEquals(20, $mappedBall['time']);
 
         // 9. cardio
         $mapped = $this->mapper->mapToColumns('cardio', ['distance' => 5000, 'distanceUnit' => 'm', 'time' => 1200, 'calories' => 400], 'lbs');
@@ -172,17 +180,13 @@ class SetFieldMapperTest extends TestCase
         $mapped = $this->mapper->mapFromColumns('static-hold', $set);
         $this->assertEquals(90, $mapped['duration']);
 
-        // 7. weighted-carry
-        $set = new LiftSet(['weight' => 60, 'time' => 30]);
-        $mapped = $this->mapper->mapFromColumns('weighted-carry', $set);
+        // 7. weighted-carry logTypes
+        $set = new LiftSet(['weight' => 60, 'distance' => 100, 'distance_unit' => 'm', 'time' => 30]);
+        $mapped = $this->mapper->mapFromColumns('weighted-carry-2-kb', $set);
         $this->assertEquals(60, $mapped['weight']);
+        $this->assertEquals(100, $mapped['distance']);
+        $this->assertEquals('m', $mapped['distance_unit']);
         $this->assertEquals(30, $mapped['duration']);
-
-        // 8. dual-kettlebell — returns 'weight' (Athlete handles rename to kbWeight + unit conversion)
-        $set = new LiftSet(['weight' => 24, 'time' => 45]);
-        $mapped = $this->mapper->mapFromColumns('dual-kettlebell', $set);
-        $this->assertEquals(24, $mapped['weight']);
-        $this->assertEquals(45, $mapped['duration']);
 
         // 9. cardio — returns snake_case (Athlete handles rename)
         $set = new LiftSet(['distance' => 1609.34, 'distance_unit' => 'm', 'time' => 480, 'calories' => 150]);
