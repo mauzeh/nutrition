@@ -352,6 +352,41 @@ class PrEngineTest extends TestCase
         $this->assertNull($engine->resolveFamily('banded_resistance'));
     }
 
+    public function test_timed_output_family_resolves_and_detects_prs(): void
+    {
+        $engine = new PrEngine();
+        $this->assertEquals('timed_output', $engine->resolveFamily('timed-reps'));
+        $this->assertEquals('timed_output', $engine->resolveFamily(null, 'timed_output'));
+
+        // Both duration + reps present
+        $bothMetrics = $engine->computeMetrics(['liftSets' => [['time' => 40, 'reps' => 12]]], 'timed_output');
+        $this->assertEquals(40, $bothMetrics['time']);
+        $this->assertEquals(40, $bothMetrics['volume']);
+        $this->assertEquals(12, $bothMetrics['max_reps']);
+        $this->assertEquals(12, $bothMetrics['bodyweight_volume']);
+
+        $bothPRs = $engine->detectPRs($bothMetrics, [], 'timed_output');
+        $typesBoth = array_column($bothPRs['prs'], 'type');
+        $this->assertContains('time', $typesBoth);
+        $this->assertContains('volume', $typesBoth);
+        $this->assertContains('max_reps', $typesBoth);
+        $this->assertContains('bodyweight_volume', $typesBoth);
+
+        // Reps-only (duration null)
+        $repsMetrics = $engine->computeMetrics(['liftSets' => [['time' => null, 'reps' => 12]]], 'timed_output');
+        $this->assertArrayNotHasKey('time', $repsMetrics);
+        $this->assertEquals(0, $repsMetrics['volume']);
+        $this->assertEquals(12, $repsMetrics['max_reps']);
+        $this->assertEquals(12, $repsMetrics['bodyweight_volume']);
+
+        // Duration-only (reps null)
+        $durMetrics = $engine->computeMetrics(['liftSets' => [['time' => 40, 'reps' => null]]], 'timed_output');
+        $this->assertEquals(40, $durMetrics['time']);
+        $this->assertEquals(40, $durMetrics['volume']);
+        $this->assertArrayNotHasKey('max_reps', $durMetrics);
+        $this->assertEquals(0, $durMetrics['bodyweight_volume']);
+    }
+
     // ─── "Why not" reasons ───────────────────────────────────────────────────────
 
     public function test_non_pr_emits_a_structured_reason(): void

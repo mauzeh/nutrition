@@ -127,6 +127,7 @@ class ExerciseResolverService
             'barbell', 'single-dumbbell', 'dual-dumbbell', 'kettlebell', 'ball', 'machine' => 'regular',
             'weighted-carry', 'sled', 'weighted-carry-1-kb', 'weighted-carry-2-kb', 'weighted-carry-1-db', 'weighted-carry-2-db', 'weighted-carry-ball' => 'load_output',
             'static-hold' => 'static_hold',
+            'timed-reps' => 'timed_output',
             'bodyweight', 'bodyweight-reps', 'added-weight' => 'bodyweight',
             'banded' => 'banded_resistance',
             'cardio', 'cardio-calories', 'cardio-distance' => 'cardio',

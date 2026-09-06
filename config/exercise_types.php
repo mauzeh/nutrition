@@ -318,6 +318,47 @@ return [
                 'sets' => 20,
             ],
         ],
+
+        /**
+         * Timed Output Exercise Type
+         * 
+         * Dynamic movement exercises dosed by time and/or reps.
+         * Duration (time) and reps are optional metrics (at least one required).
+         */
+        'timed_output' => [
+            'class' => \App\Services\ExerciseTypes\TimedOutputExerciseType::class,
+            'validation' => [
+                'time' => 'nullable|integer|min:1|max:900|required_without:reps',
+                'reps' => 'nullable|integer|min:1|max:1000|required_without:time',
+            ],
+            'supports_1rm' => false,
+            'form_fields' => ['time', 'reps'],
+            'field_labels' => [
+                'time' => 'Duration (seconds):',
+                'reps' => 'Reps:',
+                'sets' => 'Sets:',
+            ],
+            'field_increments' => [
+                'time' => 1,
+                'reps' => 1,
+                'sets' => 1,
+            ],
+            'field_defaults' => [
+                'time' => 30,
+                'reps' => 10,
+                'sets' => 3,
+            ],
+            'field_mins' => [
+                'time' => 1,
+                'reps' => 1,
+                'sets' => 1,
+            ],
+            'field_maxes' => [
+                'time' => 900,
+                'reps' => 1000,
+                'sets' => 20,
+            ],
+        ],
     ],
     
     /**

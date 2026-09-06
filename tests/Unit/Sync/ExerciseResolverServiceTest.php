@@ -172,5 +172,9 @@ class ExerciseResolverServiceTest extends TestCase
         // static-hold should derive static_hold exercise type
         $hold = $this->resolver->resolve('L-Sit Hold', $this->user, 'static-hold');
         $this->assertEquals('static_hold', $hold->exercise_type);
+
+        // timed-reps should derive timed_output exercise type
+        $timedReps = $this->resolver->resolve('Glute Bridge March', $this->user, 'timed-reps');
+        $this->assertEquals('timed_output', $timedReps->exercise_type);
     }
 }

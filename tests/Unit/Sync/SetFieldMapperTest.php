@@ -214,4 +214,37 @@ class SetFieldMapperTest extends TestCase
         $this->assertEquals('Blue', $mapped['band_color']);
         $this->assertEquals(10, $mapped['reps']);
     }
+
+    public function test_timed_reps_mapping_round_trip(): void
+    {
+        // (a) both present
+        $toColsBoth = $this->mapper->mapToColumns('timed-reps', ['duration' => 40, 'reps' => 12], 'lbs');
+        $this->assertEquals(40, $toColsBoth['time']);
+        $this->assertEquals(12, $toColsBoth['reps']);
+
+        $setBoth = new LiftSet(['time' => 40, 'reps' => 12]);
+        $fromColsBoth = $this->mapper->mapFromColumns('timed-reps', $setBoth);
+        $this->assertEquals(40, $fromColsBoth['duration']);
+        $this->assertEquals(12, $fromColsBoth['reps']);
+
+        // (b) reps-only (duration null)
+        $toColsReps = $this->mapper->mapToColumns('timed-reps', ['reps' => 12], 'lbs');
+        $this->assertNull($toColsReps['time']);
+        $this->assertEquals(12, $toColsReps['reps']);
+
+        $setReps = new LiftSet(['time' => null, 'reps' => 12]);
+        $fromColsReps = $this->mapper->mapFromColumns('timed-reps', $setReps);
+        $this->assertNull($fromColsReps['duration']);
+        $this->assertEquals(12, $fromColsReps['reps']);
+
+        // (c) duration-only (reps null)
+        $toColsDur = $this->mapper->mapToColumns('timed-reps', ['duration' => 40], 'lbs');
+        $this->assertEquals(40, $toColsDur['time']);
+        $this->assertNull($toColsDur['reps']);
+
+        $setDur = new LiftSet(['time' => 40, 'reps' => null]);
+        $fromColsDur = $this->mapper->mapFromColumns('timed-reps', $setDur);
+        $this->assertEquals(40, $fromColsDur['duration']);
+        $this->assertNull($fromColsDur['reps']);
+    }
 }

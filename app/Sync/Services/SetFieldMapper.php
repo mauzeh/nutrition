@@ -49,6 +49,11 @@ class SetFieldMapper
                 $columns['time'] = $setData['duration'] ?? null;
                 break;
 
+            case 'timed-reps':
+                $columns['time'] = $setData['duration'] ?? null;
+                $columns['reps'] = $setData['reps'] ?? null;
+                break;
+
             case 'weighted-carry':
             case 'weighted-carry-1-kb':
             case 'weighted-carry-2-kb':
@@ -123,6 +128,11 @@ class SetFieldMapper
 
             case 'static-hold':
                 $data['duration'] = $set->time;
+                break;
+
+            case 'timed-reps':
+                $data['duration'] = $set->time;
+                $data['reps'] = $set->reps;
                 break;
 
             case 'weighted-carry':
