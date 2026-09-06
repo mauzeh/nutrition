@@ -327,6 +327,8 @@ return [
          */
         'timed_output' => [
             'class' => \App\Services\ExerciseTypes\TimedOutputExerciseType::class,
+            'optional_fields' => ['time', 'reps'],
+            'group_rule' => ['kind' => 'require_one_of', 'fields' => ['time', 'reps']],
             'validation' => [
                 'time' => 'nullable|integer|min:1|max:900|required_without:reps',
                 'reps' => 'nullable|integer|min:1|max:1000|required_without:time',

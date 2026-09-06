@@ -130,4 +130,60 @@ class TimedRepsSyncTest extends TestCase
         $response = $this->withHeaders($headers)->postJson('/api/sync/logs', $invalidLog);
         $response->assertStatus(422);
     }
+
+    public function test_rejects_timed_reps_set_when_both_duration_and_reps_are_zero(): void
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('test-device')->plainTextToken;
+        $headers = ['Authorization' => 'Bearer '.$token];
+
+        $invalidLog = [
+            'exercise_name' => 'Zero Timed Reps',
+            'canonical_name' => 'zero_timed_reps',
+            'date' => '2026-09-06',
+            'log_type' => 'timed-reps',
+            'weight_unit' => 'lbs',
+            'sets' => [
+                ['duration' => 0, 'reps' => 0],
+            ],
+        ];
+
+        $response = $this->withHeaders($headers)->postJson('/api/sync/logs', $invalidLog);
+        $response->assertStatus(422);
+    }
+
+    public function test_web_create_and_update_timed_output_validation(): void
+    {
+        $user = User::factory()->create();
+        $exercise = Exercise::factory()->create([
+            'exercise_type' => 'timed_output',
+            'log_type' => 'timed-reps',
+        ]);
+
+        // Rejects all-null / missing time and reps
+        $responseAllNull = $this->actingAs($user)->post('/lift-logs', [
+            'exercise_id' => $exercise->id,
+            'rounds' => 1,
+            'date' => '2026-09-06',
+        ]);
+        $responseAllNull->assertSessionHasErrors(['time', 'reps']);
+
+        // Accepts time only
+        $responseTimeOnly = $this->actingAs($user)->post('/lift-logs', [
+            'exercise_id' => $exercise->id,
+            'rounds' => 1,
+            'time' => 30,
+            'date' => '2026-09-06',
+        ]);
+        $responseTimeOnly->assertSessionHasNoErrors();
+
+        // Accepts reps only
+        $responseRepsOnly = $this->actingAs($user)->post('/lift-logs', [
+            'exercise_id' => $exercise->id,
+            'rounds' => 1,
+            'reps' => 10,
+            'date' => '2026-09-06',
+        ]);
+        $responseRepsOnly->assertSessionHasNoErrors();
+    }
 }

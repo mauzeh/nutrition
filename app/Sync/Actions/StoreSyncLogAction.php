@@ -7,6 +7,7 @@ use App\Models\LiftLog;
 use App\Models\User;
 use App\Sync\Services\ExerciseResolverService;
 use App\Sync\Services\SetFieldMapper;
+use App\Sync\Services\SetGroupRuleValidator;
 use Carbon\Carbon;
 
 class StoreSyncLogAction
@@ -14,6 +15,7 @@ class StoreSyncLogAction
     public function __construct(
         private ExerciseResolverService $exerciseResolver,
         private SetFieldMapper $setFieldMapper,
+        private SetGroupRuleValidator $setGroupRuleValidator,
     ) {}
 
     /**
@@ -39,6 +41,9 @@ class StoreSyncLogAction
             $validated['log_type'],
             $validated['canonical_name'] ?? null
         );
+
+        // Enforce group_rule on sets
+        $this->setGroupRuleValidator->validateSets($exercise->exercise_type, $validated['sets'] ?? []);
 
         // Parse logged_at date at 12:00:00
         $loggedAt = Carbon::parse($validated['date'])->setTime(12, 0, 0);

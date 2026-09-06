@@ -155,13 +155,18 @@ class LiftLogFormFactory
                 $field['max'] = $definition['max'] ?? 1000;
                 $fieldNameForAria = $definition['name'] === 'reps' && $strategy->getTypeName() === 'cardio' ? 'distance' : $definition['name'];
                 $field['ariaLabels'] = [
+                    'field' => $definition['label'] ?? ucfirst($definition['name']),
                     'decrease' => 'Decrease ' . $fieldNameForAria,
                     'increase' => 'Increase ' . $fieldNameForAria,
                 ];
             } elseif ($definition['type'] === 'select') {
                 $field['options'] = $definition['options'];
                 $field['ariaLabels'] = [
-                    'field' => 'Select ' . strtolower(trim($definition['label'], ':'))
+                    'field' => 'Select ' . strtolower(trim($definition['label'] ?? $definition['name'], ':'))
+                ];
+            } else {
+                $field['ariaLabels'] = [
+                    'field' => trim($definition['label'] ?? ucfirst($definition['name']), ':'),
                 ];
             }
             

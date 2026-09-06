@@ -448,4 +448,54 @@ class LiftLogEditTest extends TestCase
         $roundsField = $numericFields->firstWhere('name', 'rounds');
         $this->assertEquals(3, $roundsField['defaultValue'], 'Rounds field should show 3 sets');
     }
+
+    /** @test */
+    public function edit_page_renders_synced_timed_reps_log_without_exception()
+    {
+        $timedExercise = Exercise::factory()->create([
+            'user_id' => $this->user->id,
+            'exercise_type' => 'timed_output',
+            'log_type' => 'timed-reps',
+        ]);
+        $timedLog = LiftLog::factory()->create([
+            'user_id' => $this->user->id,
+            'exercise_id' => $timedExercise->id,
+        ]);
+        $timedLog->liftSets()->create([
+            'weight' => 0,
+            'time' => 45,
+            'reps' => 12,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->get(route('lift-logs.edit', $timedLog));
+
+        $response->assertStatus(200);
+        $response->assertSee('45');
+        $response->assertSee('12');
+    }
+
+    /** @test */
+    public function form_field_blade_partial_renders_defensively_without_aria_labels()
+    {
+        $fieldDefWithoutAria = [
+            'id' => 'test-field',
+            'name' => 'test_field',
+            'label' => 'Test Field:',
+            'type' => 'text',
+            'defaultValue' => 'test',
+        ];
+
+        $html = view('mobile-entry.components.form-field', [
+            'field' => $fieldDefWithoutAria,
+            'data' => [
+                'buttons' => [
+                    'decrement' => '-',
+                    'increment' => '+',
+                ],
+            ],
+        ])->render();
+
+        $this->assertStringContainsString('aria-label=""', $html);
+    }
 }

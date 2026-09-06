@@ -34,16 +34,6 @@ class LogController
             'idempotency_key' => 'nullable|string',
         ]);
 
-        if ($request->input('log_type') === 'timed-reps') {
-            foreach ($request->input('sets', []) as $index => $set) {
-                if (empty($set['duration']) && empty($set['time']) && empty($set['reps'])) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        "sets.{$index}" => ['Each set for timed-reps requires either duration or reps.'],
-                    ]);
-                }
-            }
-        }
-
         $idempotencyKey = $request->header('X-Idempotency-Key') ?? $request->input('idempotency_key');
         if ($idempotencyKey) {
             $validated['idempotency_key'] = $idempotencyKey;

@@ -67,6 +67,20 @@ class ExerciseTypeFactory
         
         return $strategy;
     }
+
+    /**
+     * Create an exercise type strategy by type name string.
+     */
+    public static function createFromTypeName(string $typeName): ExerciseTypeInterface
+    {
+        $typeConfig = config("exercise_types.types.{$typeName}");
+
+        if ($typeConfig && isset($typeConfig['class']) && class_exists($typeConfig['class'])) {
+            return new $typeConfig['class']();
+        }
+
+        return new RegularExerciseType();
+    }
     
     /**
      * Create a strategy instance based on exercise properties
