@@ -117,6 +117,9 @@ class UpdateLiftLogAction
             'band_color' => $request->input('band_color'),
             'reps' => $request->input('reps'),
             'time' => $request->input('time'), // For static holds
+            'distance' => $request->input('distance'), // For load_output / carries
+            'distance_unit' => $request->input('distance_unit'),
+            'calories' => $request->input('calories'),
             'notes' => $request->input('comments'),
         ];
         

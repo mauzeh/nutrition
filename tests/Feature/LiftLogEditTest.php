@@ -450,6 +450,82 @@ class LiftLogEditTest extends TestCase
     }
 
     /** @test */
+    public function updating_a_load_output_log_persists_the_changed_distance()
+    {
+        $carryExercise = Exercise::factory()->create([
+            'user_id' => $this->user->id,
+            'exercise_type' => 'load_output',
+            'log_type' => 'weighted-carry-ball',
+        ]);
+        $carryLog = LiftLog::factory()->create([
+            'user_id' => $this->user->id,
+            'exercise_id' => $carryExercise->id,
+        ]);
+        $carryLog->liftSets()->create([
+            'weight' => 90,
+            'distance' => 50,
+            'distance_unit' => 'm',
+            'time' => 30,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->put(route('lift-logs.update', $carryLog), [
+                'exercise_id' => $carryExercise->id,
+                'weight' => 90,
+                'distance' => 120,
+                'distance_unit' => 'ft',
+                'time' => 30,
+                'rounds' => 1,
+                'comments' => '',
+                'date' => $carryLog->logged_at->format('Y-m-d'),
+                'logged_at' => $carryLog->logged_at->format('H:i'),
+            ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $set = $carryLog->fresh()->liftSets()->first();
+        $this->assertEquals(120, $set->distance, 'Changed distance should persist after update');
+        $this->assertEquals('ft', $set->distance_unit, 'Changed distance unit should persist after update');
+    }
+
+    /** @test */
+    public function edit_page_prepopulates_distance_fields_for_load_output_exercises()
+    {
+        $carryExercise = Exercise::factory()->create([
+            'user_id' => $this->user->id,
+            'exercise_type' => 'load_output',
+            'log_type' => 'weighted-carry-ball',
+        ]);
+        $carryLog = LiftLog::factory()->create([
+            'user_id' => $this->user->id,
+            'exercise_id' => $carryExercise->id,
+        ]);
+        $carryLog->liftSets()->create([
+            'weight' => 90,
+            'distance' => 120,
+            'distance_unit' => 'ft',
+            'time' => 30,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->get(route('lift-logs.edit', $carryLog));
+
+        $response->assertStatus(200);
+
+        $data = $response->viewData('data');
+        $formData = $data['components'][0]['data'];
+        $numericFields = collect($formData['numericFields']);
+
+        $distanceField = $numericFields->firstWhere('name', 'distance');
+        $this->assertNotNull($distanceField, 'Distance field should exist for load_output exercises');
+        $this->assertEquals(120, $distanceField['defaultValue'], 'Distance field should be prepopulated from the stored set');
+
+        $distanceUnitField = $numericFields->firstWhere('name', 'distance_unit');
+        $this->assertNotNull($distanceUnitField, 'Distance unit field should exist for load_output exercises');
+        $this->assertEquals('ft', $distanceUnitField['defaultValue'], 'Distance unit should be prepopulated from the stored set');
+    }
+
+    /** @test */
     public function edit_page_renders_synced_timed_reps_log_without_exception()
     {
         $timedExercise = Exercise::factory()->create([

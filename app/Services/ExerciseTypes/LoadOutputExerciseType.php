@@ -158,7 +158,10 @@ class LoadOutputExerciseType extends BaseExerciseType
                 'label' => 'Unit:',
                 'type' => 'select',
                 'defaultValue' => $defaults['distance_unit'] ?? 'm',
-                'options' => ['m' => 'm', 'ft' => 'ft'],
+                'options' => [
+                    ['value' => 'm', 'label' => 'm'],
+                    ['value' => 'ft', 'label' => 'ft'],
+                ],
             ],
             [
                 'name' => 'time',
