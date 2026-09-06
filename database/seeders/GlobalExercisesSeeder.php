@@ -20,6 +20,86 @@ class GlobalExercisesSeeder extends Seeder
         }
         
         $this->command->info("Successfully created " . count($exercises) . " exercises");
+
+        $this->seedCarrySplitExercises();
+    }
+
+    /**
+     * Seed the six global "carry split" exercise definitions.
+     *
+     * These rows were originally inserted by the migration
+     * 2026_09_04_113405_retype_carry_exercises_create_splits_and_purge_history. They are
+     * baseline reference data (new global exercises), so they were moved here to keep the
+     * migration limited to transforming existing rows and to stop them from polluting the
+     * RefreshDatabase test database (which replays migrations but never runs seeders).
+     *
+     * Uses firstOrCreate keyed on canonical_name so this is idempotent: environments that
+     * already have these rows (e.g. production, where the original migration created them) are
+     * left untouched, and running the seeder more than once will not create duplicates.
+     *
+     * @return void
+     */
+    private function seedCarrySplitExercises(): void
+    {
+        $carrySplitExercises = [
+            [
+                'title' => 'Mixed Rack Carry (KB)',
+                'canonical_name' => 'mixed_rack_carry_kb',
+                'exercise_type' => 'load_output',
+                'log_type' => 'weighted-carry-2-kb',
+                'show_in_feed' => true,
+                'user_id' => null,
+            ],
+            [
+                'title' => 'Mixed Rack Carry (DB)',
+                'canonical_name' => 'mixed_rack_carry_db',
+                'exercise_type' => 'load_output',
+                'log_type' => 'weighted-carry-2-db',
+                'show_in_feed' => true,
+                'user_id' => null,
+            ],
+            [
+                'title' => 'Single-Arm Overhead Carry (KB)',
+                'canonical_name' => 'single_arm_oh_carry_kb',
+                'exercise_type' => 'load_output',
+                'log_type' => 'weighted-carry-1-kb',
+                'show_in_feed' => true,
+                'user_id' => null,
+            ],
+            [
+                'title' => 'Single-Arm Overhead Carry (DB)',
+                'canonical_name' => 'single_arm_oh_carry_db',
+                'exercise_type' => 'load_output',
+                'log_type' => 'weighted-carry-1-db',
+                'show_in_feed' => true,
+                'user_id' => null,
+            ],
+            [
+                'title' => 'Suitcase March (KB)',
+                'canonical_name' => 'suitcase_march_kb',
+                'exercise_type' => 'load_output',
+                'log_type' => 'weighted-carry-1-kb',
+                'show_in_feed' => true,
+                'user_id' => null,
+            ],
+            [
+                'title' => 'Suitcase March (DB)',
+                'canonical_name' => 'suitcase_march_db',
+                'exercise_type' => 'load_output',
+                'log_type' => 'weighted-carry-1-db',
+                'show_in_feed' => true,
+                'user_id' => null,
+            ],
+        ];
+
+        foreach ($carrySplitExercises as $exerciseData) {
+            Exercise::firstOrCreate(
+                ['canonical_name' => $exerciseData['canonical_name']],
+                $exerciseData
+            );
+        }
+
+        $this->command->info('Seeded ' . count($carrySplitExercises) . ' carry-split exercises');
     }
     
     /**

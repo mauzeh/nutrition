@@ -54,75 +54,25 @@ return new class extends Migration
         }
 
         // 2. Create the six split defs
-        $splitDefs = [
-            [
-                'title' => 'Mixed Rack Carry (KB)',
-                'canonical_name' => 'mixed_rack_carry_kb',
-                'exercise_type' => 'load_output',
-                'log_type' => 'weighted-carry-2-kb',
-                'user_id' => null,
-                'show_in_feed' => true,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ],
-            [
-                'title' => 'Mixed Rack Carry (DB)',
-                'canonical_name' => 'mixed_rack_carry_db',
-                'exercise_type' => 'load_output',
-                'log_type' => 'weighted-carry-2-db',
-                'user_id' => null,
-                'show_in_feed' => true,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ],
-            [
-                'title' => 'Single-Arm Overhead Carry (KB)',
-                'canonical_name' => 'single_arm_oh_carry_kb',
-                'exercise_type' => 'load_output',
-                'log_type' => 'weighted-carry-1-kb',
-                'user_id' => null,
-                'show_in_feed' => true,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ],
-            [
-                'title' => 'Single-Arm Overhead Carry (DB)',
-                'canonical_name' => 'single_arm_oh_carry_db',
-                'exercise_type' => 'load_output',
-                'log_type' => 'weighted-carry-1-db',
-                'user_id' => null,
-                'show_in_feed' => true,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ],
-            [
-                'title' => 'Suitcase March (KB)',
-                'canonical_name' => 'suitcase_march_kb',
-                'exercise_type' => 'load_output',
-                'log_type' => 'weighted-carry-1-kb',
-                'user_id' => null,
-                'show_in_feed' => true,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ],
-            [
-                'title' => 'Suitcase March (DB)',
-                'canonical_name' => 'suitcase_march_db',
-                'exercise_type' => 'load_output',
-                'log_type' => 'weighted-carry-1-db',
-                'user_id' => null,
-                'show_in_feed' => true,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ],
-        ];
-
-        foreach ($splitDefs as $def) {
-            DB::table('exercises')->updateOrInsert(
-                ['canonical_name' => $def['canonical_name']],
-                $def
-            );
-        }
+        //
+        // The six global "carry split" exercise definitions that used to be inserted here have
+        // been moved to database/seeders/GlobalExercisesSeeder.php. They are baseline reference
+        // data (new global rows), not a transformation of existing rows, so they belong with the
+        // rest of the seeded global exercises rather than in a migration.
+        //
+        // Why this matters: tests use RefreshDatabase, which replays the full migration stack
+        // before every test but never runs seeders. Inserting these rows here put six phantom
+        // global exercises into every test database and broke unrelated exercise-count
+        // assertions across the suite. Keeping the inserts out of the migration keeps the test
+        // database clean while the seeder remains the single source of truth for global
+        // exercises. This migration retains only its data-transformation duties below
+        // (re-typing existing carry rows and purging retired history).
+        //
+        // NOTE ON PROVISIONING: this project provisions via `php artisan migrate` only (the
+        // Forge deploy script does not run `db:seed`). A brand-new environment must therefore
+        // run `php artisan db:seed --class=GlobalExercisesSeeder` (or the full DatabaseSeeder)
+        // to create these rows. Existing environments already have them from when this
+        // migration originally ran with the inline inserts.
 
         // 3. PURGE (soft-delete) all lift_logs + lift_sets + personal_records for all affected + retired canonical_names
         $allPurgedCanonicals = array_merge(
@@ -208,7 +158,14 @@ return new class extends Migration
                 ]);
         }
 
-        // Delete created split definitions
+        // Delete the split definitions.
+        //
+        // These rows are now created by GlobalExercisesSeeder rather than by up(). We still
+        // remove them here so that rolling this migration back on an environment where up() had
+        // originally inserted them (before the inserts were moved to the seeder) returns the
+        // exercises table to its pre-migration state. On a fresh environment provisioned via the
+        // seeder these rows may not have been created by this migration at all; deleting absent
+        // rows is a harmless no-op.
         DB::table('exercises')
             ->whereIn('canonical_name', [
                 'mixed_rack_carry_kb',

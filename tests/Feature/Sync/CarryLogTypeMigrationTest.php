@@ -14,7 +14,7 @@ class CarryLogTypeMigrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_migration_retypes_creates_splits_and_purges_history(): void
+    public function test_migration_retypes_and_purges_history_without_creating_splits(): void
     {
         $user = User::factory()->create();
 
@@ -101,11 +101,13 @@ class CarryLogTypeMigrationTest extends TestCase
         $this->assertEquals('load_output', $farmersEx->exercise_type);
         $this->assertEquals('weighted-carry-2-kb', $farmersEx->log_type);
 
-        // (b) 6 split defs created
-        $splitDef = Exercise::where('canonical_name', 'mixed_rack_carry_kb')->first();
-        $this->assertNotNull($splitDef);
-        $this->assertEquals('load_output', $splitDef->exercise_type);
-        $this->assertEquals('weighted-carry-2-kb', $splitDef->log_type);
+        // (b) The six split defs are NO LONGER created by this migration. They were moved to
+        // GlobalExercisesSeeder (see that seeder's seedCarrySplitExercises()), because they are
+        // baseline reference data rather than a transformation of existing rows, and seeding
+        // them from the migration polluted the RefreshDatabase test database. This migration is
+        // now only responsible for re-typing existing carry rows and purging retired history, so
+        // we assert the split defs were NOT created here.
+        $this->assertNull(Exercise::where('canonical_name', 'mixed_rack_carry_kb')->first());
 
         // (c) History for carry exercises PURGED (soft-deleted)
         $this->assertSoftDeleted('lift_logs', ['id' => $farmersLog->id]);
