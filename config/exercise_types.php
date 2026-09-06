@@ -237,6 +237,9 @@ return [
                 'distance' => 'nullable|numeric|min:0|max:999',
                 'distance_unit' => 'nullable|string|in:m,ft',
                 'time' => 'nullable|integer|min:1|max:900',
+                // Carries/sled have no reps — override the web actions' base `reps => required` rule
+                // (merged in via getValidationRules); completeness is the distance/time group_rule above.
+                'reps' => 'nullable|integer|min:1',
             ],
             'chart_type' => 'load_output_progression',
             'supports_1rm' => false,
