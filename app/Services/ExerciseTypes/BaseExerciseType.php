@@ -54,7 +54,43 @@ abstract class BaseExerciseType implements ExerciseTypeInterface
      */
     public function getValidationRules(?User $user = null): array
     {
-        return $this->config['validation'] ?? [];
+        $rules = $this->config['validation'] ?? [];
+
+        // Derive the group-rule enforcement (e.g. "at least one of {time,reps}") from the SINGLE
+        // declarative `group_rule` source, rather than hand-authoring required_without twice. The sync
+        // path reads the same `group_rule` via SetGroupRuleValidator; both compile from one source.
+        return $this->mergeGroupRuleValidation($rules);
+    }
+
+    /**
+     * Compile this type's declarative `group_rule` into Laravel validation rules and merge them into
+     * the given base rules. Currently supports `require_one_of` → a `required_without` cross-pair over
+     * the group's fields. The single source is `config.group_rule`; nothing else authors the rule.
+     *
+     * @param array<string,string> $rules
+     * @return array<string,string>
+     */
+    protected function mergeGroupRuleValidation(array $rules): array
+    {
+        $groupRule = $this->config['group_rule'] ?? null;
+        if (($groupRule['kind'] ?? null) !== 'require_one_of') {
+            return $rules;
+        }
+
+        $fields = $groupRule['fields'] ?? [];
+        foreach ($fields as $field) {
+            $others = array_values(array_filter($fields, fn ($f) => $f !== $field));
+            if ($others === []) {
+                continue;
+            }
+            $requiredWithout = 'required_without:' . implode(',', $others);
+            // Append to any existing type/format constraints for the field (e.g. nullable|integer|...).
+            $rules[$field] = isset($rules[$field]) && $rules[$field] !== ''
+                ? $rules[$field] . '|' . $requiredWithout
+                : 'nullable|' . $requiredWithout;
+        }
+
+        return $rules;
     }
     
     /**
@@ -588,6 +624,8 @@ abstract class BaseExerciseType implements ExerciseTypeInterface
             case 'weight':
             case 'reps':
             case 'sets':
+            case 'time':
+            case 'duration':
                 return 'numeric';
             default:
                 return 'text';

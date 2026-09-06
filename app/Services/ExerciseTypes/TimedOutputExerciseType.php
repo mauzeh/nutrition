@@ -81,6 +81,36 @@ class TimedOutputExerciseType extends BaseExerciseType
         return 'Duration Progress';
     }
 
+    /**
+     * Uniform reps/sets label. reps is an OPTIONAL metric for timed output: when it is
+     * absent/zero, show just the set count ("3 sets") rather than a meaningless "3 x 0".
+     */
+    protected function formatUniformRepsSets(int $count, string $effort): string
+    {
+        if ((int) $effort <= 0) {
+            return $count . ($count === 1 ? ' set' : ' sets');
+        }
+
+        return $count . ' x ' . $effort;
+    }
+
+    /**
+     * Non-uniform grouped-set label. Same rule: drop the "x {reps}" when reps is absent/zero,
+     * so a duration-only group reads "{count} sets - {duration badge}" not "{count} x 0 - …".
+     */
+    protected function formatBadgeGroupLabel(int $count, string $effort, string $badgeLabel): string
+    {
+        $setsText = (int) $effort <= 0
+            ? $count . ($count === 1 ? ' set' : ' sets')
+            : $count . ' x ' . $effort;
+
+        if ($badgeLabel === '') {
+            return $setsText;
+        }
+
+        return "{$setsText} -&nbsp;<strong>{$badgeLabel}</strong>";
+    }
+
     private function formatDuration(int $seconds): string
     {
         if ($seconds < 60) {

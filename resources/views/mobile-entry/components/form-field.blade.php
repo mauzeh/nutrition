@@ -99,7 +99,7 @@
     @elseif(isset($field['type']) && $field['type'] === 'text')
         <input type="text" id="{{ $field['id'] }}" name="{{ $field['name'] }}" class="text-input" value="{{ old($field['name'], $field['defaultValue']) }}" placeholder="{{ $field['placeholder'] ?? '' }}" aria-label="{{ $field['ariaLabels']['field'] ?? '' }}">
     @elseif(isset($field['type']) && $field['type'] === 'password')
-        <input type="password" id="{{ $field['id'] }}" name="{{ $field['name'] }}" class="text-input" placeholder="{{ $field['placeholder'] ?? '' }}" aria-label="{{ $field['ariaLabels']['field'] ?? '' }}" autocomplete="{{ $field['name'] === 'current-password' ? 'current-password' : 'new-password' }}">
+        <input type="password" id="{{ $field['id'] }}" name="{{ $field['name'] }}" class="text-input" placeholder="{{ $field['placeholder'] ?? '' }}" aria-label="{{ $field['ariaLabels']['field'] ?? '' }}" autocomplete="{{ $field['name'] === 'current_password' ? 'current-password' : 'new-password' }}">
     @elseif(isset($field['type']) && $field['type'] === 'file')
         <input type="file" id="{{ $field['id'] }}" name="{{ $field['name'] }}" class="file-input" accept="{{ $field['accept'] ?? 'image/*' }}" aria-label="{{ $field['ariaLabels']['field'] ?? '' }}">
     @elseif(isset($field['type']) && $field['type'] === 'textarea')

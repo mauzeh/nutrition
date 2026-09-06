@@ -69,7 +69,8 @@ class TimedOutputExerciseTypeTest extends TestCase
 
         $this->assertEquals('40s', $summary['weight']);
         $this->assertTrue($summary['showWeight']);
-        $this->assertEquals('3 x 0', $summary['repsSets']);
+        // reps is optional; when absent, show just the set count (not a meaningless "3 x 0").
+        $this->assertEquals('3 sets', $summary['repsSets']);
     }
 
     public function test_format_mobile_summary_display_both_duration_and_reps(): void
@@ -92,6 +93,22 @@ class TimedOutputExerciseTypeTest extends TestCase
         $this->assertEquals('1m 30s', $summary['weight']);
         $this->assertTrue($summary['showWeight']);
         $this->assertEquals('2 x 10', $summary['repsSets']);
+    }
+
+    public function test_duration_field_renders_as_numeric_stepper(): void
+    {
+        $definitions = $this->strategy->getFormFieldDefinitions();
+        $byName = collect($definitions)->keyBy('name');
+
+        // duration (time) must be a numeric stepper like reps/sets — not a plain text input.
+        $this->assertTrue($byName->has('time'));
+        $this->assertEquals('numeric', $byName['time']['type']);
+        $this->assertArrayHasKey('increment', $byName['time']);
+        $this->assertArrayHasKey('min', $byName['time']);
+        $this->assertArrayHasKey('max', $byName['time']);
+
+        // reps is likewise a numeric stepper.
+        $this->assertEquals('numeric', $byName['reps']['type']);
     }
 
     private function createMockLiftLog(?int $duration, ?int $reps, int $sets = 3): LiftLog

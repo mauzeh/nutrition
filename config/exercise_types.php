@@ -328,10 +328,13 @@ return [
         'timed_output' => [
             'class' => \App\Services\ExerciseTypes\TimedOutputExerciseType::class,
             'optional_fields' => ['time', 'reps'],
+            // group_rule is the SINGLE source for "at least one of {time,reps}". The web path derives
+            // required_without from it (BaseExerciseType::mergeGroupRuleValidation) and the sync path
+            // enforces the same rule via SetGroupRuleValidator — neither hand-authors it twice.
             'group_rule' => ['kind' => 'require_one_of', 'fields' => ['time', 'reps']],
             'validation' => [
-                'time' => 'nullable|integer|min:1|max:900|required_without:reps',
-                'reps' => 'nullable|integer|min:1|max:1000|required_without:time',
+                'time' => 'nullable|integer|min:1|max:900',
+                'reps' => 'nullable|integer|min:1|max:1000',
             ],
             'supports_1rm' => false,
             'form_fields' => ['time', 'reps'],
