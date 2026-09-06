@@ -231,6 +231,7 @@ return [
          */
         'load_output' => [
             'class' => \App\Services\ExerciseTypes\LoadOutputExerciseType::class,
+            'group_rule' => ['kind' => 'require_one_of', 'fields' => ['distance', 'time']],
             'validation' => [
                 'weight' => 'nullable|numeric|min:0|max:2000',
                 'distance' => 'nullable|numeric|min:0|max:999',

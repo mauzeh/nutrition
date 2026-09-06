@@ -113,4 +113,68 @@ class CarryLogTypeSyncTest extends TestCase
         $this->assertEquals('m', $kbRestored['sets'][0]['distance_unit']);
         $this->assertEquals(45, $kbRestored['sets'][0]['duration']);
     }
+
+    public function test_rejects_load_output_set_when_both_distance_and_duration_are_null(): void
+    {
+        $user = User::factory()->create();
+        $token = $user->createToken('test-device')->plainTextToken;
+        $headers = ['Authorization' => 'Bearer '.$token];
+
+        $invalidLog = [
+            'exercise_name' => 'Invalid Carry',
+            'canonical_name' => 'invalid_carry',
+            'date' => '2026-09-06',
+            'log_type' => 'weighted-carry-2-kb',
+            'weight_unit' => 'lbs',
+            'sets' => [
+                ['weight' => 50], // Only load, neither distance nor duration
+            ],
+        ];
+
+        $response = $this->withHeaders($headers)->postJson('/api/sync/logs', $invalidLog);
+        $response->assertStatus(422);
+    }
+
+    public function test_web_create_and_update_load_output_validation(): void
+    {
+        $user = User::factory()->create();
+        $exercise = Exercise::factory()->create([
+            'exercise_type' => 'load_output',
+            'log_type' => 'weighted-carry-2-kb',
+        ]);
+
+        // Rejects set with neither distance nor time (even if weight is provided)
+        $responseNeither = $this->actingAs($user)->post('/lift-logs', [
+            'exercise_id' => $exercise->id,
+            'rounds' => 1,
+            'weight' => 50,
+            'date' => '2026-09-06',
+        ]);
+        $responseNeither->assertSessionHasErrors(['distance', 'time']);
+
+        // Accepts distance only
+        $responseDistanceOnly = $this->actingAs($user)->post('/lift-logs', [
+            'exercise_id' => $exercise->id,
+            'rounds' => 1,
+            'reps' => 1,
+            'weight' => 50,
+            'distance' => 100,
+            'distance_unit' => 'm',
+            'date' => '2026-09-06',
+        ]);
+        $responseDistanceOnly->assertSessionHasNoErrors();
+
+        // Accepts duration (time) only
+        $responseTimeOnly = $this->actingAs($user)->post('/lift-logs', [
+            'exercise_id' => $exercise->id,
+            'rounds' => 1,
+            'reps' => 1,
+            'weight' => 50,
+            'time' => 45,
+            'date' => '2026-09-06',
+        ]);
+        $responseTimeOnly->assertSessionHasNoErrors();
+    }
 }
+
+
